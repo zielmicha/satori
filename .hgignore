@@ -1,0 +1,13 @@
+syntax: regexp
+
+^\.
+^bin/
+^include/
+^lib
+^src/
+^var/
+/\.
+\.py[co]$
+/build/
+/dist/
+\.egg-info/
