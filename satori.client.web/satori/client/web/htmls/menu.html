@@ -1,0 +1,11 @@
+﻿<div id="menu">
+<table id="menu">
+{% for name, link in widget.menuitems %}
+    <tr> 
+    <td class="mainmenuitem">
+    <a class="menulink" href="{{link}}"> {{ name }} </a>
+    </td>
+    </tr>
+{% endfor %}
+</table>
+</div>
