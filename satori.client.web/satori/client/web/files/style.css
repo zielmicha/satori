@@ -1,0 +1,257 @@
+* 
+{
+  padding: 0;
+  margin: 0;
+}
+
+body
+{
+	background-color : black;
+}
+
+
+#banner 
+{
+	color : rgb(252,201,0); 
+	width : 100%;
+	font-size : xx-large; 
+	font-style : italic;
+	font-family : sans-serif;
+	font-weight : bold;
+	padding : 0;
+	margin-left : 20pt;
+}
+
+#middle
+{
+	font-family: arial; 
+	font-size: normal;
+	background-color: white;
+	color : black;
+	width : 100%;
+	height : 800px;
+	padding : 10px 10px 0 0;
+}
+
+#leftmenu
+{
+	width : 20%;
+	float : left;
+}
+
+#content
+{
+	width : 80%;
+	float : right;
+}	
+
+
+
+.smallinputbox
+{
+        border : 0;
+        background-color : rgb(220,220,250);
+        padding : 2pt;
+        margin  : 3pt 0pt;
+}
+
+
+.button
+{
+
+        font-weight : bold;
+        font-size   : small;
+        background : black;
+        border  : 0;
+        color   : white;
+        padding : 3pt;
+}
+
+.applybutton
+{
+
+        font-weight : bold;
+        font-size   : small;
+        background : black;
+        border  : solid 1px black;
+        color   : white;
+        width : 100%;
+        padding-top : 3pt;
+        padding-bottom : 3pt;
+}
+
+.noclickbutton
+{
+        text-align : center;
+        font-weight : bold;
+        font-size   : small;
+        background : rgb(220,220,220);
+        border  : solid 1px black;
+        color   : black;
+        width : 100%;
+        padding-top : 3pt;
+        padding-bottom : 3pt;
+}
+
+.message
+{
+	font-size : small;
+}
+
+.messageemph
+{
+	font-size : small;
+	font-weight : bold;
+}
+
+.messagecenter
+{
+	text-align : center;
+}
+
+#menu
+{
+    border-spacing : 10pt;
+    width : 100%;
+}
+
+.mainmenuitem
+{
+        vertical-align  : middle;
+	text-align : center;
+	font-size : x-large;
+	font-weight : bold;
+	width : 100%;
+	
+}
+
+
+
+a.menulink
+{
+        padding: 10pt 0 10pt 0;
+        background-color : rgb(220,220,250);
+        display : block;
+        width   : 100%;
+	color : black;
+	text-decoration : none;
+}
+
+a.menulink:visited
+{
+        padding: 10pt 0 10pt 0;
+        background-color : rgb(220,220,250);
+        display : block;
+        width   : 100%;
+	color : black;
+	text-decoration : none;
+}
+
+a.menulink:hover
+{
+        padding: 10pt 0 10pt 0;
+        background-color : rgb(200,200,250);
+        display : block;
+        width   : 100%;
+	color : black;
+	text-decoration : none;
+}
+
+table.contest_table
+{
+	width : 100%;
+	border-spacing : 5pt;
+}
+
+table.contest_table tr.header
+{
+        background-color : white;
+        font-weight : bold;
+}
+
+table.contest_table tr td
+{
+        vertical-align  : middle;
+}
+
+table.contest_table tr td.buttoncell
+{
+}
+
+
+table.contest_table tr td.linkcell
+{
+        width : 80%;
+}
+
+a.contestlink
+{
+        background-color : rgb(240,250,240);
+        padding : 5pt 10pt;
+        display : block;
+#        width   : 100%;
+        font-weight : bold;
+	color : black;
+	text-decoration : none;
+}
+
+a.stdlink
+{
+	color : black;
+	text-decoration : none;
+}
+
+a.stdlink:visited
+{
+	color : black;
+	text-decoration : none;
+}	
+
+a.stdlink:hover
+{
+	color : rgb(200,200,200);
+	text-decoration : underline;
+}	
+
+
+.newsmsg
+{
+    width : 100%;
+    border : solid 1px;
+    margin : 5pt;
+}
+
+.newstitle
+{
+    padding : 5pt;
+    background-color : black;
+    color : white;
+    font-weight : bold;
+}
+
+.global .newscontent
+{
+    padding : 5pt;
+    background-color : rgb(250,230,230);
+}
+
+.contest .newscontent
+{
+    padding : 5pt;
+    background-color : rgb(230,250,230);
+}
+
+textarea
+{
+    width : 100%;
+}
+
+div.msgtopic
+{
+    width : 50%;
+}
+
+div.msgcontent
+{
+    width : 50%;
+}
