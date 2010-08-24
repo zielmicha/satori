@@ -1,0 +1,58 @@
+
+<h4>Accepted users</h4>
+<table class="list_table">
+<tr class="header">
+    <td>Login</td>
+    <td>Full name</td>
+    <td></td>
+</tr>
+{% for cu,members in widget.accepted %}
+<tr>
+<td>
+{% for u in members %}
+{{u.login}} <br/>
+{% endfor %}
+</td>
+<td>
+{% for u in members %}
+{{u.fullname}} <br/>
+{% endfor %}
+</td>
+<td></td>
+{% endfor %}
+</tr>
+</table>
+
+
+<h4>Pending users</h4>
+<table class="list_table">
+<tr class="header">
+    <td>Login</td>
+    <td>Full name</td>
+    <td></td>
+</tr>
+{% for cu,members in widget.pending %}
+<tr>
+<td>
+{% for u in members %}
+{{u.login}} <br/>
+{% endfor %}
+</td>
+<td>
+{% for u in members %}
+{{u.fullname}} <br/>
+{% endfor %}
+</td>
+<td>
+        <form action="process.accept" method="post">
+            <input type="hidden" name="conuser_id" value="{{ cu.id }}"/>
+            <input type="hidden" name="back_to" value="{{ widget.back_to }}"/>
+            <input type="hidden" name="back_path" value="{{ widget.path }}"/>
+            <input type="submit" value="Accept" class="button"/>
+        </form>   
+
+</td>
+</tr>
+{% endfor %}
+</table>
+
