@@ -1,0 +1,43 @@
+
+<h4>Accepted users</h4>
+<table class="list_table">
+<tr class="header">
+    <td>Login</td>
+    <td>Full name</td>
+    <td></td>
+</tr>
+{% for cu in widget.accepted %}
+<tr>
+<td>
+{% for u in cu %}
+{{u.fullname}} ({{u.login}}) <br/>
+{% endfor %}
+</td>
+    <td></td>
+{% endfor %}
+</tr>
+</table>
+
+<h4>Pending users</h4>
+<table class="list_table">
+<tr class="header">
+    <td>Login</td>
+    <td>Full name</td>
+    <td></td>
+</tr>
+{% for cu in widget.pending %}
+<tr>
+{% for u in cu %}
+    <td>{{u.user.login}} </td>
+    <td>{{u.user.fullname}}</td>
+{% endfor %}
+    <td>
+        <form action="process.accept" method="post">
+            <input type="hidden" name="conuser_id" value="{{ cu.id }}"/>
+            <input type="hidden" name="back_path" value=""/>
+            <input type="submit" value="Accept" class="button"/>
+        </form>   
+    </td>
+{% endfor %}
+</tr>
+</table>
