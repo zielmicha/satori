@@ -1,0 +1,42 @@
+<h3>Results</h3>
+
+
+{% if widget.isadmin %}
+<form action="process.adjustresult" method="POST">
+
+<select name="user" onChange="submit();">
+{% for value,name,sel in widget.users %}
+<option value="{{ value }}" {% if sel %} selected="selected" {% endif %}>{{ name }}</option>
+{% endfor %}
+</select>
+<input type="submit" value="Change"/>
+<input type="hidden" name="back_to" value="{{ widget.back_to }}"/>
+<input type="hidden" name="back_path" value="{{ widget.back_path }}"/>
+</form>
+{% endif %}
+
+<table class="compact">
+<tr class="header">
+    <td>#</td>
+    <td>User</td>
+    <td>Problem</td>
+    <td>Time</td>
+    <td>Status</td>
+    <td></td>
+</tr>
+{% for s in widget.submits %}
+<tr>
+    <td>{{s.id}}</td>
+    <td>{{s.user}}</td>
+    <td>{{s.problem}}</td>
+    <td>{{s.time}}</td>
+    <td>{{s.status}}</td>
+    <td><a href="{{s.link}}" class="showhidelink">Show/hide details</a></td>
+</tr>
+{% if s.showdetails %}
+<tr>
+    <td colspan="6">{{s.details}}</td>
+</tr>
+{% endif %}
+{% endfor %}
+</table>
