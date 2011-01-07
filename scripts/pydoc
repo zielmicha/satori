@@ -1,0 +1,166 @@
+#!/usr/bin/env python2.6
+
+import sys
+import os
+
+if __name__ == '__main__':
+    sys.path.insert(0, '.')
+
+from docutils.frontend import OptionParser
+from docutils.nodes import Inline, FixedTextElement, literal_block, paragraph, title
+from docutils.parsers.rst import Parser, Directive
+from docutils.parsers.rst.directives import register_directive
+from docutils.utils import new_document
+from genshi.template import TemplateLoader
+from pygments.lexers import get_lexer_by_name
+import pygments.token
+
+from satori.misc import Namespace
+from satori.objects import Argument, DispatchOn
+from reflection import Reflector, Descriptor, Location, Module, Class, Method, Function
+
+
+class code_token(Inline, FixedTextElement):              # pylint: disable-msg=C0103,R0904
+    """A `Node` representing single source token."""
+
+    pass
+
+
+class code_block(literal_block):                         # pylint: disable-msg=C0103,R0904
+    """A `Node` representing a (formatted) source code block."""
+
+    pass
+
+
+class Code(Directive):
+    """A docutils `Directive` creating source code blocks."""
+
+    required_arguments = 1
+    optional_arguments = 0
+    final_argument_whitespace = False
+    option_spec = {}
+    has_content = True
+    node_class = code_block
+
+    def run(self):
+        """Execute this directive.
+        """
+        self.assert_has_content()
+        lang = self.arguments[0]
+        code = '\n'.join(self.content)
+        lexer = get_lexer_by_name(lang)
+        tokens = lexer.get_tokens(code)
+        node = self.node_class()
+        node['classes'] += ['code']
+        for type_, text in tokens:
+            node.append(code_token(text=text, type=type_))
+        return [node]
+
+
+register_directive('code', Code)
+register_directive('sourcecode', Code)
+
+
+class Generator(Reflector):
+    """Generates XHTML documentation based on reflection information.
+    """
+
+    @Argument('template_dir', type=str)
+    def __init__(self, template_dir):
+        self.templates = TemplateLoader(template_dir, variable_lookup='lenient')
+        self.docutils_parser = Parser()
+        self.docutils_settings = dict(
+            pep_references=False,
+            rfc_references=True,
+            tab_width=4,
+            trim_footnote_reference_space=True,
+        )
+        self.data = Namespace()
+
+    def parseDocstring(self, desc):
+        """Parse Python docstring into docutils document tree.
+        """
+        options = OptionParser()
+        options.set_defaults_from_dict(self.docutils_settings)
+        desc.doc = new_document(desc.name, settings=options.get_default_values())
+        self.docutils_parser.parse(desc.docstring or "(not documented)", desc.doc)
+        desc.doc.transformer.apply_transforms()
+        desc.shortdoc = [x for x in desc.doc.traverse() if isinstance(x, paragraph)][0]
+
+    @DispatchOn(desc=Descriptor)
+    def update(self, desc):
+        """Update descriptor information.
+        """
+        pass
+
+    @DispatchOn(desc=Location)
+    def update(self, desc):                                    # pylint: disable-msg=E0102
+        """Update Location descriptor information.
+        """
+        desc.template = 'index.html'
+        desc.target_path = os.path.join(desc.target_dir, 'index.html')
+
+    @DispatchOn(desc=Module)
+    def update(self, desc):                                    # pylint: disable-msg=E0102
+        """Update Module descriptor information.
+        """
+        if isinstance(desc.group, Location):
+            desc.template = 'module.html'
+            desc.target_path = os.path.join(desc.group.target_dir, desc.name+'.html')
+        self.parseDocstring(desc)
+        desc.doc.insert(0, title(text=desc.name))
+
+    @DispatchOn(desc=Class)
+    def update(self, desc):                                    # pylint: disable-msg=E0102
+        """Update Class descriptor information.
+        """
+        if isinstance(desc.group, Location):
+            desc.template = 'class.html'
+            filename = desc.parent.name+'.'+desc.name+'.html'
+            desc.target_path = os.path.join(desc.group.target_dir, filename)
+        self.parseDocstring(desc)
+        desc.doc.insert(0, title(text=desc.parent.name+'.'+desc.name))
+
+    @DispatchOn(desc=Function)
+    @DispatchOn(desc=Method)
+    def update(self, desc):                                    # pylint: disable-msg=E0102
+        """Update Function or Method descriptor information.
+        """
+        self.parseDocstring(desc)
+
+    def run(self):
+        """Generate the documentation.
+        """
+        # first pass: resolve references
+        for desc in self:
+            pass
+        # second pass: update descriptor data
+        for desc in self:
+            self.update(desc)
+        # third pass: generate output
+        for desc in self:
+            if not hasattr(desc, 'template'):
+                continue
+            template = self.templates.load(desc.template)
+            with open(desc.target_path, 'w') as output:
+                self.data.this = desc
+                output.write(template.generate(**self.data).render('xhtml'))
+
+
+def _sourceurl(path, line, rev):
+    return "{0}href.browser('{1}', rev='{2}'){3}#L{4}".format('${', path, rev, '}', line)
+
+
+if __name__ == '__main__':
+    target_dir = os.path.abspath(sys.argv[1])
+    revision = sys.argv[2]
+    template_dir = os.path.join(os.path.dirname(sys.argv[0]), 'pydoc.tmpl')
+    if not os.path.isdir(target_dir):
+        os.mkdir(target_dir)
+    generator = Generator(template_dir=template_dir)
+    generator.data.pygments = pygments.token.STANDARD_TYPES
+    location = generator.add(Location, root=os.getcwd())
+    location.target_dir = target_dir.rstrip('/') + '/'
+    location.target_url = lambda path: "{0}href.api('{1}'){2}".format('${', path, '}')
+    location.source_url = lambda path, line: _sourceurl(path, line, revision)
+    generator.run()
