@@ -1,0 +1,17 @@
+{% extends "templates/index.html" %}
+
+{% block content %}
+
+{% if page_info.contest %}
+<form action={% url contest_news_edit page_info.contest.id message.id %} method="POST">
+{% else %}
+<form action={% url news_edit message.id %} method="POST">
+{% endif %}
+
+<table>
+{{ form.as_table }}
+</table>
+<input type="submit" value="Save"/>
+</form>
+
+{% endblock %}
