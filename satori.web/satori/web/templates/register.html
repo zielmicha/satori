@@ -1,0 +1,10 @@
+{% extends "templates/index.html" %}
+
+{% block content %}
+<form action={% url register %} method="POST">
+<table>
+    {{ form.as_table }}
+</table>
+<input type="submit" value="Register"/>
+</form>
+{% endblock %}
