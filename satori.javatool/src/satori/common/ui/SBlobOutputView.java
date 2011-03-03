@@ -1,12 +1,13 @@
 package satori.common.ui;
 
-import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Point;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.KeyAdapter;
+import java.awt.event.KeyEvent;
+import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.awt.event.MouseListener;
 import java.io.File;
 
 import javax.swing.BorderFactory;
@@ -18,18 +19,17 @@ import javax.swing.JPopupMenu;
 import javax.swing.SwingConstants;
 
 import satori.blob.SBlob;
+import satori.common.SData;
 import satori.common.SException;
-import satori.common.SOutput;
 import satori.main.SFrame;
 
-public class SBlobOutputView implements SInputView {
-	private final SOutput<SBlob> data;
+public class SBlobOutputView implements SPaneView {
+	private final SData<SBlob> data;
 	
-	private String desc;
 	private JButton label;
 	private Font set_font, unset_font;
 	
-	public SBlobOutputView(SOutput<SBlob> data) {
+	public SBlobOutputView(SData<SBlob> data) {
 		this.data = data;
 		initialize();
 	}
@@ -47,16 +47,14 @@ public class SBlobOutputView implements SInputView {
 		catch(SException ex) { SFrame.showErrorDialog(ex); return; }
 	}
 	
-	private Point popup_location = null;
-	
-	private void showPopup() {
+	private void showPopup(Point location) {
 		JPopupMenu popup = new JPopupMenu();
 		JMenuItem saveItem = new JMenuItem("Save");
 		saveItem.addActionListener(new ActionListener() {
 			@Override public void actionPerformed(ActionEvent e) { saveFile(); }
 		});
 		popup.add(saveItem);
-		if (popup_location != null) popup.show(label, popup_location.x, popup_location.y);
+		if (location != null) popup.show(label, location.x, location.y);
 		else popup.show(label, 0, label.getHeight());
 	}
 	
@@ -67,34 +65,22 @@ public class SBlobOutputView implements SInputView {
 		label.setContentAreaFilled(false);
 		label.setOpaque(false);
 		label.setHorizontalAlignment(SwingConstants.LEADING);
-		label.addActionListener(new ActionListener() {
-			@Override public void actionPerformed(ActionEvent e) { showPopup(); }
+		label.setToolTipText(data.getDescription());
+		label.addMouseListener(new MouseAdapter() {
+			@Override public void mouseClicked(MouseEvent e) { showPopup(e.getPoint()); }
 		});
-		label.addMouseListener(new MouseListener() {
-			@Override public void mousePressed(MouseEvent e) { popup_location = e.getPoint(); }
-			@Override public void mouseReleased(MouseEvent e) { popup_location = null; }
-			@Override public void mouseClicked(MouseEvent e) {}
-			@Override public void mouseEntered(MouseEvent e) {}
-			@Override public void mouseExited(MouseEvent e) {}
+		label.addKeyListener(new KeyAdapter() {
+			@Override public void keyPressed(KeyEvent e) {
+				if (e.getKeyCode() == KeyEvent.VK_ENTER) { e.consume(); showPopup(null); }
+			}
 		});
 		set_font = label.getFont().deriveFont(Font.PLAIN);
 		unset_font = label.getFont().deriveFont(Font.ITALIC);
 		update();
 	}
 	
-	@Override public void setDimension(Dimension dim) {
-		label.setPreferredSize(dim);
-		label.setMinimumSize(dim);
-		label.setMaximumSize(dim);
-	}
-	@Override public void setDescription(String desc) {
-		this.desc = desc;
-		update();
-		label.setToolTipText(desc);
-	}
-	
 	@Override public void update() {
 		label.setFont(data.get() != null ? set_font : unset_font);
-		label.setText(data.get() != null ? data.get().getName() : desc);
+		label.setText(data.get() != null ? data.get().getName() : data.getDescription());
 	}
 }

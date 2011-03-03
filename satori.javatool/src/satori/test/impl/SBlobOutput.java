@@ -1,10 +1,10 @@
 package satori.test.impl;
 
 import satori.blob.SBlob;
-import satori.common.SOutput;
+import satori.common.SData;
 import satori.metadata.SOutputMetadata;
 
-public class SBlobOutput implements SOutput<SBlob> {
+public class SBlobOutput implements SData<SBlob> {
 	private final SOutputMetadata meta;
 	private final STestResult result;
 	
@@ -14,4 +14,5 @@ public class SBlobOutput implements SOutput<SBlob> {
 	}
 	
 	@Override public SBlob get() { return (SBlob)result.getOutput(meta); }
+	@Override public String getDescription() { return meta.getDescription(); }
 }

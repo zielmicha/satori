@@ -40,9 +40,8 @@ import satori.common.SList;
 import satori.common.SListener0;
 import satori.common.SListener1;
 import satori.common.SView;
-import satori.common.SViewList;
 import satori.common.ui.SBlobInputView;
-import satori.common.ui.SInputView;
+import satori.common.ui.SPaneView;
 import satori.common.ui.SPane;
 import satori.common.ui.SScrollPane;
 import satori.common.ui.SStringInputView;
@@ -65,7 +64,7 @@ public class STestPane implements SPane, SList<STestImpl> {
 	
 	private List<SSolutionPane> solution_panes = new ArrayList<SSolutionPane>();
 	private List<STestImpl> tests = new ArrayList<STestImpl>();
-	private SViewList parent_views = new SViewList();
+	private List<SView> parent_views = new ArrayList<SView>();
 	
 	private JComponent pane;
 	private JComponent input_pane;
@@ -488,8 +487,6 @@ public class STestPane implements SPane, SList<STestImpl> {
 			});
 			pane.add(name_field);
 			SBlobInputView judge_view = new SBlobInputView(new SJudgeInput(test));
-			judge_view.setDimension(SDimension.itemDim);
-			judge_view.setDescription("Judge file");
 			judge_view.setBlobLoader(new SBlobInputView.BlobLoader() {
 				private Map<String, SBlob> blobs = null;
 				@Override public Map<String, SBlob> getBlobs() throws SException {
@@ -498,6 +495,9 @@ public class STestPane implements SPane, SList<STestImpl> {
 				}
 			});
 			test.addView(judge_view);
+			judge_view.getPane().setPreferredSize(SDimension.itemDim);
+			judge_view.getPane().setMinimumSize(SDimension.itemDim);
+			judge_view.getPane().setMaximumSize(SDimension.itemDim);
 			pane.add(judge_view.getPane());
 			update();
 		}
@@ -556,12 +556,13 @@ public class STestPane implements SPane, SList<STestImpl> {
 		
 		private void fillPane() {
 			for (SInputMetadata im : test.getInputMetadata()) {
-				SInputView view;
+				SPaneView view;
 				if (im.getType() == SBlobType.INSTANCE) view = new SBlobInputView(new SBlobInput(im, test));
 				else view = new SStringInputView(new SStringInput(im, test));
-				view.setDimension(SDimension.itemDim);
-				view.setDescription(im.getDescription());
 				test.addView(view);
+				view.getPane().setPreferredSize(SDimension.itemDim);
+				view.getPane().setMinimumSize(SDimension.itemDim);
+				view.getPane().setMaximumSize(SDimension.itemDim);
 				pane.add(view.getPane());
 			}
 			pane.add(Box.createVerticalGlue());
@@ -733,6 +734,6 @@ public class STestPane implements SPane, SList<STestImpl> {
 		for (STestImpl test : tests) test.removeView(view);
 	}
 	private void addParentViews(STestImpl test) {
-		for (SView view : parent_views.get()) test.addView(view);
+		for (SView view : parent_views) test.addView(view);
 	}
 }
