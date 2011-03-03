@@ -2,6 +2,7 @@ package satori.common.ui;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.Container;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
@@ -12,14 +13,12 @@ import java.awt.datatransfer.Transferable;
 import java.awt.datatransfer.UnsupportedFlavorException;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.FocusAdapter;
 import java.awt.event.FocusEvent;
-import java.awt.event.FocusListener;
+import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
-import java.awt.event.KeyListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.awt.event.MouseListener;
-import java.awt.event.MouseMotionListener;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
@@ -47,18 +46,17 @@ import javax.swing.SwingConstants;
 import javax.swing.TransferHandler;
 
 import satori.blob.SBlob;
-import satori.common.SData;
 import satori.common.SException;
+import satori.common.SInput;
 import satori.main.SFrame;
 
-public class SBlobInputView implements SInputView {
+public class SBlobInputView implements SPaneView {
 	public static interface BlobLoader {
 		Map<String, SBlob> getBlobs() throws SException;
 	}
 	
-	private final SData<SBlob> data;
+	private final SInput<SBlob> data;
 	
-	private String desc;
 	private JComponent pane;
 	private JButton clear_button;
 	private JButton label;
@@ -68,7 +66,7 @@ public class SBlobInputView implements SInputView {
 	private Font set_font, unset_font;
 	private Color default_color;
 	
-	public SBlobInputView(SData<SBlob> data) {
+	public SBlobInputView(SInput<SBlob> data) {
 		this.data = data;
 		initialize();
 	}
@@ -189,9 +187,7 @@ public class SBlobInputView implements SInputView {
 		catch(SException ex) { SFrame.showErrorDialog(ex); return; }
 	}
 	
-	private Point popup_location = null;
-	
-	private void showPopup() {
+	private void showPopup(Point location) {
 		JPopupMenu popup = new JPopupMenu();
 		if (blob_loader != null) {
 			JMenuItem loadRemoteItem = new JMenuItem("Load remote");
@@ -215,25 +211,8 @@ public class SBlobInputView implements SInputView {
 			@Override public void actionPerformed(ActionEvent e) { rename(); }
 		});
 		popup.add(renameItem);
-		if (popup_location != null) popup.show(label, popup_location.x, popup_location.y);
+		if (location != null) popup.show(label, location.x, location.y);
 		else popup.show(label, 0, label.getHeight());
-	}
-	
-	private class LabelListener implements MouseListener, MouseMotionListener {
-		@Override public void mousePressed(MouseEvent e) {
-			popup_location = e.getPoint();
-		}
-		@Override public void mouseReleased(MouseEvent e) {
-			popup_location = null;
-		}
-		@Override public void mouseDragged(MouseEvent e) {
-			popup_location = null;
-			label.getTransferHandler().exportAsDrag(label, e, TransferHandler.COPY);
-		}
-		@Override public void mouseClicked(MouseEvent e) {}
-		@Override public void mouseEntered(MouseEvent e) {}
-		@Override public void mouseExited(MouseEvent e) {}
-		@Override public void mouseMoved(MouseEvent e) {}
 	}
 	
 	private static DataFlavor sFileFlavor = new DataFlavor(SBlob.class, "Satori file");
@@ -320,7 +299,14 @@ public class SBlobInputView implements SInputView {
 	}
 	
 	private void initialize() {
-		pane = new JPanel(null);
+		pane = new JPanel(new SLayoutManagerAdapter() {
+			@Override public void layoutContainer(Container parent) {
+				Dimension dim = parent.getSize();
+				clear_button.setBounds(0, (dim.height-13)/2, 13, 13);
+				label.setBounds(15, 0, dim.width-15, dim.height);
+				field.setBounds(15, 0, dim.width-15, dim.height);
+			}
+		});
 		byte[] icon = {71,73,70,56,57,97,7,0,7,0,-128,1,0,-1,0,0,-1,-1,-1,33,-7,4,1,10,0,1,0,44,0,0,0,0,7,0,7,0,0,2,13,12,126,6,-63,-72,-36,30,76,80,-51,-27,86,1,0,59};
 		clear_button = new JButton(new ImageIcon(icon));
 		clear_button.setMargin(new Insets(0, 0, 0, 0));
@@ -336,32 +322,31 @@ public class SBlobInputView implements SInputView {
 		label.setContentAreaFilled(false);
 		label.setOpaque(false);
 		label.setHorizontalAlignment(SwingConstants.LEADING);
-		label.addActionListener(new ActionListener() {
-			@Override public void actionPerformed(ActionEvent e) { showPopup(); }
-		});
-		LabelListener label_listener = new LabelListener();
+		label.setToolTipText(data.getDescription());
+		MouseAdapter label_listener = new MouseAdapter() {
+			@Override public void mouseClicked(MouseEvent e) { showPopup(e.getPoint()); }
+			@Override public void mouseDragged(MouseEvent e) {
+				label.getTransferHandler().exportAsDrag(label, e, TransferHandler.COPY);
+			}
+		};
 		label.addMouseListener(label_listener);
 		label.addMouseMotionListener(label_listener);
+		label.addKeyListener(new KeyAdapter() {
+			@Override public void keyPressed(KeyEvent e) {
+				if (e.getKeyCode() == KeyEvent.VK_ENTER) { e.consume(); showPopup(null); }
+			}
+		});
 		label.setTransferHandler(new SFileTransferHandler());
 		pane.add(label);
 		field = new JTextField();
 		field.setVisible(false);
-		field.addKeyListener(new KeyListener() {
+		field.addKeyListener(new KeyAdapter() {
 			@Override public void keyPressed(KeyEvent e) {
-				if (e.getKeyCode() == KeyEvent.VK_ENTER) {
-					e.consume();
-					renameDone(true);
-				}
-				if (e.getKeyCode() == KeyEvent.VK_ESCAPE) {
-					e.consume();
-					renameCancel();
-				}
+				if (e.getKeyCode() == KeyEvent.VK_ENTER) { e.consume(); renameDone(true); }
+				if (e.getKeyCode() == KeyEvent.VK_ESCAPE) { e.consume(); renameCancel(); }
 			}
-			@Override public void keyReleased(KeyEvent e) {}
-			@Override public void keyTyped(KeyEvent e) {}
 		});
-		field.addFocusListener(new FocusListener() {
-			@Override public void focusGained(FocusEvent e) {}
+		field.addFocusListener(new FocusAdapter() {
 			@Override public void focusLost(FocusEvent e) { renameDone(false); }
 		});
 		pane.add(field);
@@ -371,25 +356,9 @@ public class SBlobInputView implements SInputView {
 		update();
 	}
 	
-	@Override public void setDimension(Dimension dim) {
-		pane.setPreferredSize(dim);
-		pane.setMinimumSize(dim);
-		pane.setMaximumSize(dim);
-		clear_button.setBounds(0, (dim.height-13)/2, 13, 13);
-		label.setBounds(15, 0, dim.width-15, dim.height);
-		field.setBounds(15, 0, dim.width-15, dim.height);
-	}
-	@Override public void setDescription(String desc) {
-		this.desc = desc;
-		update();
-		label.setToolTipText(desc);
-	}
-	
 	@Override public void update() {
-		if (data.isEnabled()) pane.setBackground(data.isValid() ? default_color : Color.YELLOW);
-		else pane.setBackground(Color.LIGHT_GRAY);
-		SBlob blob = data.get();
-		label.setFont(blob != null ? set_font : unset_font);
-		label.setText(blob != null ? blob.getName() : desc);
+		pane.setBackground(data.isValid() ? default_color : Color.YELLOW);
+		label.setFont(data.get() != null ? set_font : unset_font);
+		label.setText(data.get() != null ? data.get().getName() : data.getDescription());
 	}
 }
