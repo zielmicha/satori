@@ -1,0 +1,96 @@
+{% extends "templates/index.html" %}
+
+{% block content %}
+
+{% load switch %}
+
+<h3>Submit {{widget.sid}}</h4>
+
+
+<table class="tlist">
+<tr>
+    <th>#</th>
+    <th>User</th>
+    <th>Problem</th>
+    <th>Time</th>
+    <th>Status</th>
+</tr>
+<tr>
+    <td>{{widget.sid}}</td>
+    <td>{{widget.contestant.name}}</td>
+    <td>{{widget.problem.code}}</td>
+    <td>{{widget.time|date:"Y-m-d, H:i:s"}}</td>
+
+<td class={% switch widget.status %}
+                {% case "QUE" %} "staQUE"
+                {% case "ACC" %} "staACC"
+                {% case "OK" %} "staOK"
+                {% case "TLE" %} "staTLE"
+                {% case "ANS" %} "staANS"
+                {% case "RTE" %} "staRTE"
+                {% case "MEM" %} "staMEM"
+                {% case "REJ" %} "staREJ"
+                {% case "CMP" %} "staCMP"
+                {% else %} ""
+           {% endswitch %}>
+
+    {{widget.status}}</td>
+</tr>
+
+
+</table>
+
+<h3>Checking report</h4>
+{{widget.details|safe}}
+
+
+{% if widget.suites %}
+<h3>Suite results</h3>
+
+{% for result in widget.suites %}
+<h4>Suite: {{result.test_suite.name}}</h4>
+{% for key, attr in result.attributes.iteritems %}
+{% if not attr.is_blob %}
+{{ key }} : {{ attr.value}}
+{% else %}
+{{ key }} : <a href="{% url download "download" "TestSuiteResult" result.test_suite_result.id key attr.filename %}">({{ attr.filename }})</a>
+{% endif %}
+</br>
+{% endfor %}
+{% endfor %}
+
+{% endif %}
+
+{% if widget.results %}
+<h3>Test results</h3>
+
+{% for result in widget.results %}
+<h4>Test: {{result.test.name}}</h4>
+{% for key, attr in result.attributes.iteritems %}
+{% if not attr.is_blob %}
+{{ key }} : {{ attr.value}}
+{% else %}
+{{ key }} : <a href="{% url download "download" "TestResult" result.test_result.id key attr.filename %}">({{ attr.filename }})</a>
+{% endif %}
+<br/>
+{% endfor %}
+{% endfor %}
+
+{% endif %}
+
+
+<h3>Actions</h3>
+
+<form action="{% url submit_override page_info.contest.id widget.sid %}" method="POST">
+    <input type="submit" name="rejudge" value="Rejudge submit"/>
+</form>
+
+
+<h3>Code (<a href="{% url download_group "download" "Submit" widget.sid "data" "content" filename %}">download</a>)</h3>
+{% if widget.code %}
+{{widget.code|safe}}
+{% else %}
+Cannot render this file, please download.
+{% endif %}
+
+{% endblock %}
