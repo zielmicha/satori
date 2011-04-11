@@ -1,0 +1,41 @@
+{% extends "templates/index.html" %}
+
+{% block header %}
+{{ form.media }}
+{% endblock %}
+
+
+
+{% block content %}
+
+<form action="" method="POST">
+<table>
+{{ base_form.as_table }}
+{{ form.as_table }}
+</table>
+<input type="submit" name="save" value="Save changes"/>
+<input type="submit" name="delete" value="Delete ranking"/>
+</form>
+
+<h3>Contest problems</h3>
+
+<table>
+<tr>
+    <th>Code</th>
+    <th>Title</th>
+    <th>Suite in ranking</th>
+    <th>Specific parameters</th>
+    <th></th>
+</tr>
+{% for problem, suite, params in problem_list %}
+<tr>
+    <td>{{problem.code}}</td>
+    <td>{{problem.title}}</td>
+    <td>{% if suite %} {{suite.name}} {% else %} Default ({{problem.default_test_suite.name}}) {% endif %}</td>
+    <td>{% if params %} Yes {% else %} No {% endif %}</td>
+    <td><a href={% url ranking_editparams page_info.contest.id ranking.id problem.id %}>(edit)</a></td>
+</tr>
+{% endfor %}
+</table>
+
+{% endblock %}
