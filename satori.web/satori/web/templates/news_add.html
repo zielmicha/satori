@@ -1,0 +1,19 @@
+{% extends "templates/index.html" %}
+
+{% block content %}
+
+{% if page_info.contest %}
+<form action={% url contest_news_add page_info.contest.id %} method="POST">
+{% else %}
+<form action={% url news_add %} method="POST">
+{% endif %}
+
+{{ form.fid }}
+<input class="button wiki_button" type="submit" name="save" value="Save"/>
+<h3>Add news</h3>
+<table class="wiki_form">
+    {{ form.as_table }}
+</table>
+</form>
+{% include "templates/attachments_add.html" %}
+{% endblock %}
