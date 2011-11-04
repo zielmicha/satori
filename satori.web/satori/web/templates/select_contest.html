@@ -1,0 +1,80 @@
+{% extends "templates/index.html" %}
+
+{% block content %}
+
+{% if managed %}
+<h3>Managed contests:</h3>
+<table>
+    {% for cinfo in managed %}
+    {% if show_archived or not cinfo.contest.archived %}
+    <tr>
+        <td><a href="{% url contest_main cinfo.contest.id %}">{{ cinfo.contest.name }}</td>
+        <td>{{ cinfo.contest.description }}</td>
+    </tr>
+    {% endif %}
+    {% endfor %}
+</table>
+{% endif %}
+
+
+{% if participating %}
+<h3>Joined contests:</h3>
+<table>
+    {% for cinfo in participating %}
+    {% if show_archived or not cinfo.contest.archived %}
+    <tr>
+        <td><a href="{% url contest_main cinfo.contest.id %}">{{ cinfo.contest.name }}</td>
+        <td>{{ cinfo.contest.description }}</td>
+        <td>{% if not cinfo.contestant.accepted %} (pending) {% endif %}</td>
+    </tr>
+    {% endif %}
+    {% endfor %}
+</table>
+{% endif %}
+
+
+{% if other %}
+<h3>Other contests:</h3>
+<table>
+    {% for cinfo in other %}
+    {% if show_archived or not cinfo.contest.archived %}
+    <tr>
+        <td><a href="{% url contest_main cinfo.contest.id %}">{{ cinfo.contest.name }}</td>
+        <td>{{ cinfo.contest.description }}</td>
+        <td>
+            {% if cinfo.can_join %}
+                <form action="{% url select_contest %}" method="POST"/><input type="submit" name="{{cinfo.contest.id}}" value="Join"/></form>
+            {% else %} 
+                {% if cinfo.can_apply %}
+                <form action="{% url select_contest %}" method="POST"/><input type="submit" name="{{cinfo.contest.id}}" value="Apply"/></form>
+                {% endif %}
+            {% endif %}
+        </td>
+    </tr>
+    {% endif %}
+    {% endfor %}
+</table>
+{% endif %}
+
+
+{% if create_form %}
+<h4>Add new contest</h4>
+<form action="" method="POST">
+<table>
+{{ create_form.as_table }}
+</table>
+<input class="button" type="submit" name="addcontest" value="Add contest"/>
+</form>
+{% endif %}
+
+<form action="" method="GET">
+Show archived contests:
+<select name="show_archived">
+  <option value="on">Yes</option>
+  <option value="off" selected>No</option>
+</select>
+<input type="submit"/>
+</form>
+
+
+{% endblock %}
