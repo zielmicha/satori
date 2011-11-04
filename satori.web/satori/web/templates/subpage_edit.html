@@ -1,0 +1,21 @@
+{% extends "templates/index.html" %}
+
+{% block content %}
+
+{% if page_info.contest %}
+<form action={% url contest_subpage_edit page_info.contest.id subpage.id %} method="POST" id="edit_form">
+{% else %}
+<form action={% url subpage_edit subpage.id %} method="POST" id="edit_form">
+{% endif %}
+
+{{ form.fid }}
+<h3>Edit subpage</h3>
+<table class="wiki_form">
+    {{ form.as_table }}
+</table>
+
+<div><input class="button" type="submit" name="save" value="Save subpage"/>
+<input class="button button_warn" type="submit" name="delete" value="Delete subpage"/></div>
+</form>
+{% include "templates/attachments_edit.html" %}
+{% endblock %}
