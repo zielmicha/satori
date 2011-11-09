@@ -1,0 +1,14 @@
+{% extends "templates/index.html" %}
+
+{% block content %}
+
+
+<h2>Results</h2>
+
+<table class="results">
+    {{ results.render_table|safe }}
+</table>
+    {{ results.render_scrollbar|safe }}
+    {{ results.render_filters|safe }}
+
+{% endblock %}
