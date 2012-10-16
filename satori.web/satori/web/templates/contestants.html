@@ -1,0 +1,40 @@
+{% extends "templates/index.html" %}
+
+{% block content %}
+
+{% if accepted.total > 0 %}
+
+<h4>Accepted contestants</h4>
+<form action="" method="POST"/>
+<table class="results">
+{{ accepted.render_table|safe }}
+</table>
+{{ accepted.render_scrollbar|safe }}
+<p>
+<input class="button" type="submit" name="revoke" value="Unaccept selected"/>
+<input class="button" type="submit" name="hide" value="Hide selected"/>
+<input class="button" type="submit" name="show" value="Unhide selected"/>
+</p>
+</form>
+
+{% endif %}
+
+{% if pending.total > 0 %}
+
+<h4>Pending contestants</h4>
+<form action="" method="POST"/>
+<table class="results">
+{{ pending.render_table|safe }}
+</table>
+{{ pending.render_scrollbar|safe }}
+<p>
+<input class="button" type="submit" name="accept" value="Accept selected"/>
+<input class="button" type="submit" name="dismiss" value="Dismiss selected"/>
+</p>
+</form>
+{% endif %}
+
+<h4>Add user manually</h4>
+<form action="" method="POST">{{ add_form }}<input class="button" type="submit" name="add" value="Add"/></form>
+
+{% endblock %}
