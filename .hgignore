@@ -1,0 +1,20 @@
+syntax: regexp
+
+^\.
+^bin/
+^include/
+^lib/
+^local/
+^src/
+^var/
+^tmp/
+/\.
+\.py[co]$
+/build/
+/dist/
+\.egg-info/
+tmp/*
+satori.javatool/bin/*
+satori.javatool/lib/*
+syncdb.sh
+\.orig$

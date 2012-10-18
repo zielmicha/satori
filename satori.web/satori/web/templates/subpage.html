@@ -1,0 +1,30 @@
+{% extends "templates/index.html" %}
+
+{% block content %}
+<p>
+{% if can_edit %}
+{% if page_info.contest %}
+<a class="button" href="{% url contest_subpage_edit page_info.contest.id subpage.id %}">Edit subpage</a>
+{% else %}
+<a class="button" href="{% url subpage_edit subpage.id %}">Edit subpage</a>
+{% endif %}
+{% endif %}
+</p>
+
+{{content|safe}}
+
+{% comment %}
+{% if can_edit %}
+<h4>Attachments</h4>
+<table>
+    {% for afile in attachments %}
+    <tr><td>
+        <a href="{% url download_group 'download' 'Subpage' subpage.id 'content_files' afile afile  %}">{{ afile }}</a>
+    </td></tr>
+    {% endfor %}
+</table>
+{% endif %}
+{% endcomment %}
+
+
+{% endblock %}
