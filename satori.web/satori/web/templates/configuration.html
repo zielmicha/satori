@@ -1,0 +1,29 @@
+{% extends "templates/index.html" %}
+
+{% block content %}
+
+
+<h4>Global subpages</h4>
+<table class="simple">
+    {{ global_subpages.render_table }}
+</table>
+
+<a class="button" href="{% url subpage_add %}">Add new subpage</a>
+
+
+<hr class="divide"/>
+
+<h4>Problem setters</h4>
+
+<table class="simple">
+    {{ problem_setters.render_table }}
+</table>
+
+<h4>Add problem setter:</h4>
+<form action="" method="POST">
+{{ form }} <input type="submit" class="button" name="add" value="Add"/>
+</form>
+
+
+
+{% endblock %}
