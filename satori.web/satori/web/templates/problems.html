@@ -1,0 +1,70 @@
+{% extends "templates/index.html" %}
+
+{% block header %}
+
+{% include "showhide.html" %}
+
+{{ form.media }}
+
+{% endblock %}
+
+{% block content %}
+
+<form action="" method="POST"/>
+
+{% if moregroups %}
+
+{% for g in groups %}
+{% if g.groupname and not forloop.last %}
+<h4>{% if g.groupname %} {{g.groupname}} {% else %} Other problems: {% endif %} [<a class="stdlink" href="javascript:unhide('{{g.prefix}}');">show/hide</a>]</h4>
+<div class="unhidden" id="{{g.prefix}}">
+{% else %}
+<h4>{% if g.groupname %} {{g.groupname}} {% else %} Other problems: {% endif %} [<a class="stdlink" href="javascript:unhide('{{g.prefix}}');">show/hide</a>]</h4>
+<div class="unhidden" id="{{g.prefix}}">
+{% endif %}
+<table class="results">
+    {{g.render_table}}
+</table>
+</div>
+{% endfor %}
+
+{% else %}
+
+{% for g in groups %}
+<h4>{{g.groupname}}</h4>
+<table class="results">
+    {{g.render_table}}
+</table>
+{% endfor %}
+
+{% endif %}
+
+{% if admin %}
+<h4>Mass edit</h4>
+{{form.submitstart.errors}}
+{{form.submitfinish.errors}}
+<p>Submitting allowed from {{form.submitstart}} to {{form.submitfinish}}
+<input class="button" type="submit" name="changesubmit" value="Enable submitting"/>
+</p>
+<div class="button_bar">
+<input class="button" type="submit" name="revokesubmit" value="Disable submitting"/>
+<input class="button" type="submit" name="publish" value="Reveal problems"/>
+<input class="button" type="submit" name="revokeview" value="Hide problems"/>
+</div>
+
+<p>Add to group: {{form.group}} 
+<input class="button" type="submit" name="addgroup" value="Add to group"/>
+</p>
+
+</form>
+{% endif %}
+
+{% if page_info.contest_is_admin %}
+<hr class="divide"/>
+<div class="button_bar">
+<a class="button" href="{% url contest_problems_add page_info.contest.id %}">Add new problem</a>
+<a class="button" href="{% url contest_copyproblems page_info.contest.id %}">Copy from another contest</a>
+</div>
+{% endif %}
+{% endblock %}
+
