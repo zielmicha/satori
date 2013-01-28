@@ -1,22 +1,23 @@
 syntax: regexp
 
 ^\.
+/\.
+/build/
+/dist/
+\.py[co]$
+\.egg-info/
+tmp/*
+^satori.cribfinder/compare/compare03$
+^satori.cribfinder/compare/parseClang$
+^satori.javatool/bin/*
+^satori.javatool/lib/*
+^satori.judge/runner/runner$
+^syncdb.sh$
+\.orig$
 ^bin/
 ^include/
-^lib
+^lib/
+^local/
 ^src/
 ^var/
 ^tmp/
-/\.
-\.py[co]$
-/build/
-/dist/
-\.egg-info/
-tmp/*
-^satori.javatool/bin/*
-^satori.javatool/lib/*
-^syncdb.sh$
-\.orig$
-^satori.cribfinder/compare/compare03$
-^satori.cribfinder/compare/parseClang$
-^satori.judge/runner/runner$

@@ -23,23 +23,37 @@ DATABASE_PASSWORD = ''         # Not used with sqlite3.
 DATABASE_HOST = ''             # Set to empty string for localhost. Not used with sqlite3.
 DATABASE_PORT = ''             # Set to empty string for default. Not used with sqlite3.
 
-USE_SSL = False
-THRIFT_HOST = 'student.tcs.uj.edu.pl'
-THRIFT_PORT = 32889
-BLOB_PORT = 32887
-if getpass.getuser() == 'gutowski':
+USE_SSL = True
+THRIFT_HOST = 'dev.satori.tcs.uj.edu.pl'
+THRIFT_PORT = 38889
+BLOB_PORT = 38887
+params = os.environ.get('SATORI_BACKEND', None)
+if params:
+    params = params.split(':')
+    assert len(params) == 3, '$SATORI_BACKEND should be of form host:thrift_port:blob_port'
+    THRIFT_HOST = params[0]
+    THRIFT_PORT = int(params[1])
+    BLOB_PORT = int(params[2])
+elif getpass.getuser() == 'gutowski':
+    USE_SSL = False
     THRIFT_HOST = 'localhost'
     THRIFT_PORT = 39889
     BLOB_PORT = 39887
-    USE_SSL = False
-if (getpass.getuser() == 'zzzmwm01') or (getpass.getuser() == 'mwrobel'):
+elif (getpass.getuser() == 'zzzmwm01') or (getpass.getuser() == 'mwrobel'):
     THRIFT_HOST = 'localhost'
     THRIFT_PORT = 37889
     BLOB_PORT = 37887
-#if getpass.getuser() == 'duraj':
+elif getpass.getuser() == 'boraks':
+    USE_SSL = False
+    THRIFT_HOST = 'student.tcs.uj.edu.pl'
+    THRIFT_PORT = 32889
+    BLOB_PORT = 32887
+#elif getpass.getuser() == 'duraj':
+#    USE_SSL = False
 #    THRIFT_HOST = 'localhost'
 #    THRIFT_PORT = 36889
 #    BLOB_PORT = 36887
+del params
 
 LOGGING = {
         'version': 1,

@@ -10,8 +10,8 @@ from django.core.urlresolvers import reverse
 from django.shortcuts import render_to_response
 from django import forms
 from datetime import datetime
-from satori.web.utils.files import valid_attachments
-from satori.web.utils.forms import SatoriDateTimeField
+from satori.web.utils.files import mkdtemp, valid_attachments
+from satori.web.utils.forms import SatoriDateTimeField, SatoriSignedField
 from satori.web.utils.tables import *
 from satori.web.utils.shortcuts import text2html,fill_image_links
 
@@ -25,7 +25,7 @@ class ProblemAddForm(forms.Form):
     suite = forms.ChoiceField(choices=[])
     statement = forms.CharField(widget=forms.Textarea, required=False)
     pdf = forms.FileField(required=False)
-    fid = forms.CharField(required=True, widget=forms.HiddenInput) # (temporary) folder id
+    fid = SatoriSignedField(required=True) # (temporary) folder id
     def __init__(self,data=None,suites=[],*args,**kwargs):
         super(ProblemAddForm,self).__init__(data,*args,**kwargs)
         self.fields["suite"].choices = [[suite.id,suite.name + '(' + suite.description + ')'] for suite in suites]
@@ -46,8 +46,9 @@ def add_choose(request,page_info):
             self.problems = Problem.filter(ProblemStruct())
             self.total = len(self.problems)
             self.fields.append(TableField(name='Name',value=(lambda table,i: table.problems[i].name), 
-                                          render=(lambda table,i : '<a class="stdlink" href="'+reverse('contest_problems_add_selected',
-                                          args=[page_info.contest.id,table.problems[i].id])+'">'+table.problems[i].name+'</a>'),
+                                          render=(lambda table,i : format_html(u'<a class="stdlink" href="{0}">{1}</a>',
+                                              reverse('contest_problems_add_selected', args=[page_info.contest.id,table.problems[i].id]),
+                                              table.problems[i].name)),
                                           id=3,css='link'))
             self.fields.append(TableField(name='Description',value=(lambda table,i: table.problems[i].description), id=2, css='description'))
             
@@ -98,7 +99,7 @@ def add(request, page_info, id):
 
     else:
         #TODO(kalq): Create a hash instead of full pathname
-        fid = tempfile.mkdtemp()
+        fid = mkdtemp()
         form = ProblemAddForm(suites=suites, initial={ 'fid' : fid })
         return render_to_response('problems_add.html', { 'page_info' : page_info,
                                                          'fid' : fid,
@@ -159,7 +160,7 @@ def edit(request, page_info, id):
             else:
                 return HttpResponseRedirect(reverse('contest_problems', args=[page_info.contest.id]))
     else:
-        fid = tempfile.mkdtemp()
+        fid = mkdtemp()
         form = ProblemAddForm(initial={ 'code' : mapping.code,
                                         'title' : mapping.title,
                                         'statement' : mapping.statement,
