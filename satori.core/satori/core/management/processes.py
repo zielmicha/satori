@@ -4,27 +4,92 @@ import logging
 from multiprocessing import Process, Semaphore
 from multiprocessing.connection import Client, Listener
 from time import sleep
+import ssl
+import os
+import signal
+import sys
 
 from django.conf import settings
 from django.core.handlers.wsgi import WSGIHandler
 
 from thrift.protocol.TBinaryProtocol import TBinaryProtocolFactory
-from thrift.transport.TSocket import TServerSocket
-from thrift.transport.TSSLSocket import TSSLServerSocket
-from thrift.transport.TTransport import TFramedTransportFactory
-from thrift.server.TServer import TThreadedServer
+from thrift.transport.TSocket import TServerSocket, TSocket
+from thrift.transport.TTransport import TFramedTransportFactory, TTransportBase
+from thrift.server.TServer import TThreadedServer, TForkingServer
 
 from twisted.web import server, wsgi
-from twisted.internet import reactor, ssl
+from twisted import internet
+import twisted.internet.ssl
 
 from satori.core.api      import ars_interface
 from satori.core.checking import CheckingMaster
+from satori.core.printing import PrintingMaster
 from satori.core.dbev.notifier              import run_notifier
 from satori.core.management.master_process  import SatoriProcess
 from satori.core.thrift_server   import ThriftProcessor
 from satori.events        import Slave2, Client2, Master
 from satori.events.mapper import TrivialMapper
 
+class TLateInitSSLSocket(TTransportBase):
+    def __init__(self, handle):
+        self.handle = handle
+        self.socket = None
+
+    def getSocket(self):
+        if self.socket is None:
+            self.handle.do_handshake()
+            self.socket = TSocket()
+            self.socket.setHandle(self.handle)
+        return self.socket
+
+    def isOpen(self):
+        return self.getSocket().isOpen()
+
+    def setTimeout(self, ms):
+        return self.getSocket().setTimeout(ms)
+
+    def read(self, sz):
+        return self.getSocket().read(sz)
+
+    def write(self, sz):
+        return self.getSocket().write(sz)
+
+    def flush(self):
+        return self.getSocket().flush()
+
+    def close(self):
+        if self.socket is None:
+            self.handle.close()
+        else:
+            return self.getSocket().close()
+        
+
+class TLateInitSSLServerSocket(TServerSocket):
+  SSL_VERSION = ssl.PROTOCOL_TLSv1
+
+  def __init__(self, host=None, port=9090, certfile='cert.pem', unix_socket=None):
+    self.setCertfile(certfile)
+    TServerSocket.__init__(self, host, port)
+
+  def setCertfile(self, certfile):
+    if not os.access(certfile, os.R_OK):
+      raise IOError('No such certfile found: %s' % (certfile))
+    self.certfile = certfile
+
+  def accept(self):
+    plain_client, addr = self.handle.accept()
+    try:
+      client = ssl.wrap_socket(plain_client, certfile=self.certfile,
+                      server_side=True, ssl_version=self.SSL_VERSION,
+                      do_handshake_on_connect=False)
+    except ssl.SSLError, ssl_exc:
+      plain_client.close()
+      # We can't raise the exception, because it kills most TServer derived serve()
+      # methods.
+      # Instead, return None, and let the TServer instance deal with it in
+      # other exception handling.  (but TSimpleServer dies anyway)
+      return None 
+    return TLateInitSSLSocket(client)
 
 class EventMasterProcess(SatoriProcess):
     def __init__(self):
@@ -67,30 +132,60 @@ class ThriftServerProcess(SatoriProcess):
     def __init__(self):
         super(ThriftServerProcess, self).__init__('thrift server')
 
+    def do_handle_signal(self, signum, frame):
+        if self.serverpid == os.getpid():
+            for child in self.server.children:
+                os.kill(child, signal.SIGTERM)
+                os.waitpid(child, 0)
+        sys.exit(0)
+
     def do_run(self):
         if settings.USE_SSL:
-            socket = TSSLServerSocket(port=settings.THRIFT_PORT, certfile=settings.SSL_CERTIFICATE)
+            socket = TLateInitSSLServerSocket(port=settings.THRIFT_PORT, certfile=settings.SSL_CERTIFICATE)
         else:
             socket = TServerSocket(port=settings.THRIFT_PORT)
-        server = TThreadedServer(ThriftProcessor(), socket, TFramedTransportFactory(), TBinaryProtocolFactory())
-        server.serve()
+#        server = TThreadedServer(ThriftProcessor(), socket, TFramedTransportFactory(), TBinaryProtocolFactory())
+        self.serverpid = os.getpid()
+        self.server = TForkingServer(ThriftProcessor(), socket, TFramedTransportFactory(), TBinaryProtocolFactory())
+        self.server.serve()
 
 
-class BlobServerProcess(SatoriProcess):
+class TwistedHttpServerProcess(SatoriProcess):
     def __init__(self):
-        super(BlobServerProcess, self).__init__('blob server')
+        super(TwistedHttpServerProcess, self).__init__('http server')
 
     def do_handle_signal(self, signum, frame):
-        reactor.callFromThread(reactor.stop)
+        internet.reactor.callFromThread(internet.reactor.stop)
 
     def do_run(self):
-        resource = wsgi.WSGIResource(reactor, reactor.getThreadPool(), WSGIHandler())
+        resource = wsgi.WSGIResource(internet.reactor, internet.reactor.getThreadPool(), WSGIHandler())
         if settings.USE_SSL:
-            reactor.listenSSL(settings.BLOB_PORT, server.Site(resource), 
-                    ssl.DefaultOpenSSLContextFactory(settings.SSL_CERTIFICATE, settings.SSL_CERTIFICATE), interface=settings.BLOB_HOST)
+            internet.reactor.listenSSL(settings.BLOB_PORT, server.Site(resource), 
+                    internet.ssl.DefaultOpenSSLContextFactory(settings.SSL_CERTIFICATE, settings.SSL_CERTIFICATE), interface=settings.BLOB_HOST)
         else:
-            reactor.listenTCP(settings.BLOB_PORT, server.Site(resource), interface=settings.BLOB_HOST)
-        reactor.run()
+            internet.reactor.listenTCP(settings.BLOB_PORT, server.Site(resource), interface=settings.BLOB_HOST)
+        internet.reactor.run()
+
+
+class UwsgiHttpServerProcess(SatoriProcess):
+    def __init__(self):
+        super(UwsgiHttpServerProcess, self).__init__('http server')
+
+    def do_run(self):
+        options = ['satori: http server (uWSGI)']
+        if settings.USE_SSL:
+            options.extend(['--https', '{0}:{1},{2},{3}'.format(settings.BLOB_HOST, settings.BLOB_PORT, settings.SSL_CERTIFICATE, settings.SSL_CERTIFICATE)])
+        else:
+            options.extend(['--http', '{0}:{1}'.format(settings.BLOB_HOST, settings.BLOB_PORT)])
+        options.extend(['--master', '--module', 'satori.core.wsgi:application', '--log-date=%F %T,000 - uWSGI - INFO',
+            '--disable-logging', '--auto-procname', '--procname-prefix-spaced', 'satori:',
+            '--processes', '50', '--http-processes', '10', '--cheaper', '5', '--cheaper-step', '5', '--cheaper-overload', '5',])
+        if 'VIRTUAL_ENV' in os.environ:
+            options.extend(['--virtualenv', os.environ['VIRTUAL_ENV']])
+        os.execvp('uwsgi', options)
+
+    def terminate(self):
+        os.kill(self.pid, signal.SIGQUIT)
 
 
 class DbevNotifierProcess(SatoriProcess):
@@ -120,3 +215,7 @@ class DebugQueueProcess(EventSlaveProcess):
 class CheckingMasterProcess(EventSlaveProcess):
     def __init__(self):
         super(CheckingMasterProcess, self).__init__('checking master', [CheckingMaster()])
+
+class PrintingMasterProcess(EventSlaveProcess):
+    def __init__(self):
+        super(PrintingMasterProcess, self).__init__('printing master', [PrintingMaster()])

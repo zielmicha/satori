@@ -40,6 +40,7 @@ def view(request, page_info):
     admins =  Web.get_contest_admins(contest=contest,offset=0,limit=500).contestants
     questions = Privilege.get(contest.contestant_role,contest,'ASK_QUESTIONS')
     backups = Privilege.get(contest.contestant_role,contest,'PERMIT_BACKUP')
+    prints = Privilege.get(contest.contestant_role,contest,'PERMIT_PRINT')
     locks = Privilege.global_demand('MANAGE_LOCKS')
     anonym = Security.anonymous()
     auth = Security.authenticated()
@@ -68,7 +69,8 @@ def view(request, page_info):
         joinfield = joining.field()
         questions = forms.BooleanField(label='Questions allowed',required=False)
         backups = forms.BooleanField(label='Backups allowed',required=False)            
-    
+        prints = forms.BooleanField(label='Prints allowed',required=False)            
+
     if request.method!="POST":
         def get_date(x):
             if x:
@@ -78,7 +80,7 @@ def view(request, page_info):
             if x:
                 return x.time()
             return None
-        manage_form = ManageForm(data={'viewfield' : unicode(viewing.current), 'joinfield' : unicode(joining.current), 'name' : contest.name, 'description' : contest.description, 'lock_start_0' : get_date(contest.lock_start), 'lock_start_1' : get_time(contest.lock_start), 'lock_finish_0' : get_date(contest.lock_finish),'lock_finish_1' : get_time(contest.lock_finish), 'lock_address' : contest.lock_address, 'lock_netmask' : contest.lock_netmask, 'questions' : questions, 'backups' : backups})
+        manage_form = ManageForm(data={'viewfield' : unicode(viewing.current), 'joinfield' : unicode(joining.current), 'name' : contest.name, 'description' : contest.description, 'lock_start_0' : get_date(contest.lock_start), 'lock_start_1' : get_time(contest.lock_start), 'lock_finish_0' : get_date(contest.lock_finish),'lock_finish_1' : get_time(contest.lock_finish), 'lock_address' : contest.lock_address, 'lock_netmask' : contest.lock_netmask, 'questions' : questions, 'backups' : backups, 'prints' : prints})
         admin_form = AdminForm()
         return render_to_response('manage.html', {'page_info' : page_info, 'manage_form' : manage_form, 'admin_form' : admin_form, 'admins' : admins})
     if "addadmin" in request.POST.keys():
@@ -87,7 +89,7 @@ def view(request, page_info):
             try:
                 user = User.filter(UserStruct(login=admin_form.cleaned_data["username"]))[0]
                 contest.add_admin(user)
-                return HttpResponseRedirect(reverse('contest_manage',args=[page_info.contest.id]))
+                return HttpResponseRedirect(reverse('contest_manage',args=[contest.id]))
             except:
                 admin_form._errors['username'] = ['Adding failed!']
         return HttpResponseRedirect(reverse('contest_manage',args=[contest.id]))
@@ -101,6 +103,7 @@ def view(request, page_info):
     if "unarchive" in request.POST.keys():
         contest.modify(ContestStruct(archived=False))
         return HttpResponseRedirect(reverse('contest_manage',args=[contest.id]))
+
     admin_form = AdminForm()
     manage_form = ManageForm(request.POST)
     if not manage_form.is_valid():
@@ -122,5 +125,8 @@ def view(request, page_info):
         Privilege.grant(contest.contestant_role,contest,'PERMIT_BACKUP')
     else:
         Privilege.revoke(contest.contestant_role,contest,'PERMIT_BACKUP')    
+    if manage_form.cleaned_data['prints']:
+        Privilege.grant(contest.contestant_role,contest,'PERMIT_PRINT')
+    else:
+        Privilege.revoke(contest.contestant_role,contest,'PERMIT_PRINT')    
     return render_to_response('manage.html', {'page_info' : page_info, 'manage_form' : manage_form, 'admin_form' : admin_form, 'admins' : admins})
-

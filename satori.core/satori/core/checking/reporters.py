@@ -36,7 +36,7 @@ class AssignmentReporter(ReporterBase):
         self.test_suite_result.oa_set_str('status', 'ACC')
         self.test_suite_result.status = 'ACC'
         self.test_suite_result.report = ''
-        self.test_suite_result.save()
+        self.test_suite_result.save(force_update=True)
 
     def accumulate(self, test_result):
         pass
@@ -56,7 +56,7 @@ class AssignmentReporter(ReporterBase):
             report = oreport.value
         self.test_suite_result.status = status
         self.test_suite_result.report = report
-        self.test_suite_result.save()
+        self.test_suite_result.save(force_update=True)
         self.test_suite_result.oa_set_map(oa_map)
 
 class StatusReporter(ReporterBase):
@@ -74,7 +74,7 @@ class StatusReporter(ReporterBase):
         self.test_suite_result.oa_set_str('status', 'QUE')
         self.test_suite_result.status = 'QUE'
         self.test_suite_result.report = ''
-        self.test_suite_result.save()
+        self.test_suite_result.save(force_update=True)
 
     def accumulate(self, test_result):
         status = test_result.oa_get_str('status')
@@ -96,7 +96,7 @@ class StatusReporter(ReporterBase):
         self.test_suite_result.oa_set_str('status', status)
         self.test_suite_result.status = status
         self.test_suite_result.report = 'Finished checking: {0}'.format(self._status)
-        self.test_suite_result.save()
+        self.test_suite_result.save(force_update=True)
 
 class MultipleStatusReporter(ReporterBase):
     def __init__(self, test_suite_result):
@@ -108,7 +108,7 @@ class MultipleStatusReporter(ReporterBase):
         self.test_suite_result.oa_set_str('status', 'QUE')
         self.test_suite_result.status = 'QUE'
         self.test_suite_result.report = ''
-        self.test_suite_result.save()
+        self.test_suite_result.save(force_update=True)
 
     def accumulate(self, test_result):
         test = test_result.test
@@ -135,7 +135,7 @@ class MultipleStatusReporter(ReporterBase):
         report = u'Finished checking: {0}'.format(self._status)
         report += ' (' + u', '.join([unicode(code) + ' ' + unicode(status) for (code, status) in self._statuses.objects().sorted()]) + ')'
         self.test_suite_result.report = report
-        self.test_suite_result.save()
+        self.test_suite_result.save(force_update=True)
 
 class ACMReporter(ReporterBase):
     """
@@ -164,7 +164,7 @@ class ACMReporter(ReporterBase):
         self.test_suite_result.oa_set_str('status', 'QUE')
         self.test_suite_result.status = 'QUE'
         self.test_suite_result.report = ''
-        self.test_suite_result.save()
+        self.test_suite_result.save(force_update=True)
 
     def accumulate(self, test_result):
         test = test_result.test
@@ -212,7 +212,7 @@ class ACMReporter(ReporterBase):
         else:
             report = ''
         self.test_suite_result.report = report
-        self.test_suite_result.save()
+        self.test_suite_result.save(force_update=True)
 
 
 class PointsReporter(ReporterBase):
@@ -235,11 +235,12 @@ class PointsReporter(ReporterBase):
         self.checked = 0
         self.passed = 0
         self.weighted = 0
+        self.normalized = 0
         self._status = ''
         self.reportlines = sortedlist(key=lambda row: row[0])
         self.test_suite_result.status = 'QUE'
         self.test_suite_result.report = ''
-        self.test_suite_result.save()
+        self.test_suite_result.save(force_update=True)
 
     def accumulate(self, test_result):
         test = test_result.test
@@ -251,12 +252,11 @@ class PointsReporter(ReporterBase):
         if result == 'OK':
             self.passed = self.passed+1
         self._status = str(self.passed) + ' / '+ str(self.checked)
-        if self.params.display_time:
-            if result == 'OK' or result == 'ANS':
-                elapsed = test_result.oa_get_str('execute_time_cpu')
-            else:
-                elapsed = "\-\-"
-            limit = test.data_get_str('time')
+        if result == 'OK' or result == 'ANS':
+            elapsed = test_result.oa_get_str('execute_time_cpu', '0s')
+        else:
+            elapsed = "\-\-"
+        limit = test.data_get_str('time', '1s')
         if self.params.use_judge_score:
             score = 0
             try:
@@ -285,7 +285,7 @@ class PointsReporter(ReporterBase):
         if self.params.falling or self.params.use_judge_score:
             line.append(unicode(score))
         self.reportlines.add(line)
-        self.test_suite_result.save()
+        self.test_suite_result.save(force_update=True)
         
     def status(self):
         return True
@@ -314,7 +314,7 @@ class PointsReporter(ReporterBase):
         self.test_suite_result.oa_set_str('passed', self.passed)
         self.test_suite_result.oa_set_str('weighted', self.weighted)
         self.test_suite_result.oa_set_str('score', self.normalized)
-        self.test_suite_result.save()
+        self.test_suite_result.save(force_update=True)
 
 
 reporters = {}

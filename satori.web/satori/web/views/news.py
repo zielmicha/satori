@@ -5,7 +5,8 @@ import tempfile
 from satori.client.common import want_import
 want_import(globals(), '*')
 from satori.web.utils.decorators import general_view
-from satori.web.utils.files import valid_attachments
+from satori.web.utils.files import mkdtemp, valid_attachments
+from satori.web.utils.forms import SatoriSignedField
 from satori.web.utils.shortcuts import text2html, fill_image_links, render_to_json
 from django import forms
 from django.http import HttpResponseRedirect
@@ -14,7 +15,7 @@ from django.shortcuts import render_to_response
 
 class NewsEditForm(forms.Form):
     name = forms.CharField(label="Message title")
-    fid = forms.CharField(required=True, widget=forms.HiddenInput) # (temporary) folder id
+    fid = SatoriSignedField(required=True) # (temporary) folder id
     content = forms.CharField(widget=forms.Textarea, label="Content")
     is_sticky = forms.BooleanField(label="Always at the top", required=False)
     is_public = forms.BooleanField(label="Show in every contest", required=False)
@@ -60,11 +61,11 @@ def add(request, page_info):
             return HttpResponseRedirect(reverse('news'))
         else:
             #TODO(kalq): Find out why sometimes valid forms land here.
-            fid = form.data['fid'] if 'fid' in form.data else tempfile.mkdtemp()
+            fid = form.data['fid'] if 'fid' in form.data else mkdtemp()
     else:
         #TODO(kalq): Create a hash instead of full pathname
-        fid = tempfile.mkdtemp()
-        form = NewsEditForm(initial={ 'fid' : tempfile.mkdtemp() })
+        fid = mkdtemp()
+        form = NewsEditForm(initial={ 'fid' : fid })
     return render_to_response('news_add.html', { 'page_info' : page_info, 
                                                  'fid' : fid,
                                                  'form' : form })
@@ -100,10 +101,10 @@ def edit(request, page_info,id):
                                                               'page_info' : page_info })
             return HttpResponseRedirect(reverse('news'))
     else:
-        fid = tempfile.mkdtemp()
+        fid = mkdtemp()
         form = NewsEditForm(initial={ 'name' : message.name,
                                       'content' : message.content,
-                                      'fid' : tempfile.mkdtemp(),
+                                      'fid' : fid,
                                       'is_public' : message.is_public,
                                       'is_sticky' : message.is_sticky})
     attachments = valid_attachments(message.content_files_get_list())

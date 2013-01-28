@@ -60,6 +60,8 @@ class SatoriProcess(Process):
 
         try:
             self.do_run()
+        except SystemExit:
+            logging.info('%s exited (SystemExit)', self.name)
         except:
             logging.exception('%s exited with error', self.name)
         else:
@@ -135,15 +137,18 @@ class SatoriMasterProcess(SatoriProcess):
         
         self.sem.release()
 
-        from satori.core.management.processes import EventMasterProcess, DbevNotifierProcess, ThriftServerProcess, BlobServerProcess, DebugQueueProcess, CheckingMasterProcess
+        from satori.core.management.processes import EventMasterProcess, DbevNotifierProcess, ThriftServerProcess, TwistedHttpServerProcess, UwsgiHttpServerProcess, DebugQueueProcess, CheckingMasterProcess, PrintingMasterProcess
 
         to_start = [
                 EventMasterProcess(),
                 DebugQueueProcess(),
                 DbevNotifierProcess(),
                 CheckingMasterProcess(),
+                PrintingMasterProcess(),
                 ThriftServerProcess(),
-                BlobServerProcess(),
+#  choose one of the two following:
+                TwistedHttpServerProcess(),
+                #UwsgiHttpServerProcess(),
         ]
 
         self.started = []

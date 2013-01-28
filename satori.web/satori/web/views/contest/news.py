@@ -5,7 +5,8 @@ import tempfile
 from satori.client.common import want_import
 want_import(globals(), '*')
 from satori.web.utils.decorators import contest_view
-from satori.web.utils.files import valid_attachments
+from satori.web.utils.files import mkdtemp, valid_attachments
+from satori.web.utils.forms import SatoriSignedField
 from satori.web.utils.shortcuts import fill_image_links
 from django import forms
 from django.http import HttpResponseRedirect
@@ -15,7 +16,7 @@ from django.shortcuts import render_to_response
 class ContestNewsEditForm(forms.Form):
     name = forms.CharField(label="Message title")
     content = forms.CharField(required=True,widget=forms.Textarea, label="Content")
-    fid = forms.CharField(required=True, widget=forms.HiddenInput) # (temporary) folder id
+    fid = SatoriSignedField(required=True) # (temporary) folder id
     is_sticky = forms.BooleanField(label="Always at the top", required=False)
     is_public = forms.BooleanField(label="Show to all visitors", required=False)
 
@@ -57,8 +58,8 @@ def add(request, page_info):
             return HttpResponseRedirect(reverse('contest_news',args=[page_info.contest.id]))
     else:
         #TODO(kalq): Create a hash instead of full pathname
-        fid = tempfile.mkdtemp()
-        form = ContestNewsEditForm(initial={ 'fid' : tempfile.mkdtemp() })
+        fid = mkdtemp()
+        form = ContestNewsEditForm(initial={ 'fid' : fid })
     return render_to_response('news_add.html', { 'page_info' : page_info, 
                                                  'fid' : fid,
                                                  'form' : form })
@@ -100,7 +101,7 @@ def edit(request, page_info,id):
                                                               'page_info' : page_info })
             return HttpResponseRedirect(reverse('contest_news',args=[page_info.contest.id]))
     else:
-        fid = tempfile.mkdtemp()
+        fid = mkdtemp()
         form = ContestNewsEditForm(initial={ 'name' : message.name,
                                              'content' : message.content,
                                              'fid' : fid,

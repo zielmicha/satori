@@ -71,6 +71,9 @@ class AggregatorBase(object):
                 self.scores[c.id].ranking_entry = ranking_entry_cache.pop(c.id)
             else:
                 (self.scores[c.id].ranking_entry, created) = RankingEntry.objects.get_or_create(ranking=self.ranking, contestant=c, defaults={'position': self.position()})
+            
+            if hasattr(self.scores[c.id], 'initialize'):
+                self.scores[c.id].initialize()
 
             self.scores[c.id].update()
     
@@ -79,7 +82,7 @@ class AggregatorBase(object):
                 del self.scores[cid]
 
         for cid in ranking_entry_cache:
-        	ranking_entry_cache[cid].delete()
+            ranking_entry_cache[cid].delete()
     
     def created_submits(self, submits):
         for submit in submits:
@@ -137,11 +140,11 @@ class ACMAggregator(AggregatorBase):
                 self.params = self.score.aggregator.problem_params[problem.id]
 
             def aggregate(self, result):
+                if self.params.ignore:
+                    return
                 time = self.score.aggregator.submit_cache[result.submit_id].time
                 ok = result.oa_get_str('status') in ['OK', 'ACC']
                 if self.params.time_stop and time > self.params.time_stop:
-                    return
-                if self.params.ignore:
                     return
                 if ok:
                     self.ok = True
@@ -178,7 +181,7 @@ class ACMAggregator(AggregatorBase):
                 self.ranking_entry.row = ''
                 self.ranking_entry.individual = ''
                 self.ranking_entry.position = self.aggregator.position()
-                self.ranking_entry.save()
+                self.ranking_entry.save(force_update=True)
             else:
                 points = int(sum([s.params.score for s in score_list], 0.0))
                 time = sum([s.ok_time + self.aggregator.params.time_penalty * s.star_count for s in score_list], timedelta(0))
@@ -190,7 +193,7 @@ class ACMAggregator(AggregatorBase):
                 self.ranking_entry.row = self.aggregator.table.generate_row('',contestant_name, str(points), time_str, problems) + self.aggregator.table.row_separator
                 self.ranking_entry.individual = ''
                 self.ranking_entry.position = self.aggregator.position(points, time_seconds, self.contestant.name)
-                self.ranking_entry.save()
+                self.ranking_entry.save(force_update=True)
 
         def aggregate(self, result):
             submit = self.aggregator.submit_cache[result.submit_id]
@@ -209,11 +212,11 @@ class ACMAggregator(AggregatorBase):
             if params.time_stop is None:
                 params.time_stop = self.params.time_stop
 
-        self.table = RestTable((4, 'Lp.'), (32, 'Name'), (8, 'Score'), (16, 'Time'), (16, 'Tasks'))
+        self.table = RestTable((4, 'Rank'), (32, 'Name'), (8, 'Score'), (16, 'Time'), (16, 'Tasks'))
         
         self.ranking.header = self.table.row_separator + self.table.header_row + self.table.header_separator
         self.ranking.footer = self.table.header_row + self.table.row_separator
-        self.ranking.save()
+        self.ranking.save(force_update=True)
         
     def get_score(self):
         return self.ACMScore(self)
@@ -227,7 +230,9 @@ class ACMBoardAggregator(AggregatorBase):
 #@              <param type="datetime" name="time_start"     description="Submission start time"/>
 #@              <param type="datetime" name="time_freeze"    description="Freeze time"/>
 #@              <param type="datetime" name="time_stop"      description="Submission stop time"/>
+#@              <param type="text"     name="ignored"        description="Non-penalized results" default=""/>
 #@              <param type="time"     name="time_penalty"   description="Penalty for wrong submit" default="1200s"/>
+#@              <param type="bool"     name="resolver"       description="Prepare resolver.js"/>
 #@      </general>
 #@      <problem>
 #@              <param type="bool"     name="ignore"         description="Ignore problem" default="false"/>
@@ -245,44 +250,87 @@ class ACMBoardAggregator(AggregatorBase):
             def __init__(self, score, problem):
                 self.score = score
                 self.ok = False
-                self.star_count = 0
+                self.ok_final = False
+                self.pending = False
+                self.trials = 0
+                self.late_trials = 0
                 self.ok_time = timedelta()
                 self.ok_submit = None
                 self.result_list = sortedlist()
                 self.problem = problem
                 self.params = self.score.aggregator.problem_params[problem.id]
+                self.agr_params = self.score.aggregator.params
+                self.ignored = self.agr_params.ignored.split(',')
 
             def aggregate(self, result):
-                time = self.score.aggregator.submit_cache[result.submit_id].time
-                ok = result.oa_get_str('status') in ['OK', 'ACC']
-                if self.params.time_stop and time > self.params.time_stop:
-                    return
                 if self.params.ignore:
                     return
+                time = self.score.aggregator.submit_cache[result.submit_id].time
+                ok = result.oa_get_str('status') in ['OK', 'ACC']
+                if result.oa_get_str('status') in self.ignored:
+                    return
+                if self.params.time_stop and time > self.params.time_stop:
+                    return
+                after_freeze = (self.agr_params.time_freeze) and (time > self.agr_params.time_freeze)
+                self.trials += 1
+                if after_freeze:
+                    self.late_trials += 1
                 if ok:
+                    self.ok_final = True
+                if ok and not after_freeze:
                     self.ok = True
                 self.result_list.add((time, ok, result.submit_id))
-                self.star_count = 1
-                for (time, ok, submit_id) in self.result_list:
-                    if ok:
-                        if self.params.time_start and time > self.params.time_start:
-                            self.ok_time = time - self.params.time_start
-                        else:
-                            self.ok_time = timedelta()
-                        self.ok_submit = submit_id
-                        break
-                    self.star_count += 1
+                if self.ok_final:
+                    self.trials = 0
+                    self.late_trials = 0
+                    for (time, ok, submit_id) in self.result_list:
+                        self.trials += 1 
+                        if (self.agr_params.time_freeze) and (time > self.agr_params.time_freeze):
+                            self.late_trials += 1
+                        if ok:
+                            if self.params.time_start and time > self.params.time_start:
+                                self.ok_time = time - self.params.time_start
+                            else:
+                                self.ok_time = timedelta()
+                            self.ok_submit = submit_id
+                            break
 
             def get_str(self):
+                if self.trials==0:
+                    return ""
                 if self.ok:
-                    return ':tdpos:`'+str(self.star_count)+'`'
+                    hours = int(self.ok_time.total_seconds()) / 3600
+                    mins = (int(self.ok_time.total_seconds()) % 3600) / 60
+                    return ':tdpos:`'+str(self.trials)+'`'+' :signature:`('+str(hours)+':'+str(mins).zfill(2)+')`'
+                if self.late_trials > 0:
+                    return ':tdpnd:`'+str(self.trials-self.late_trials)+'+'+str(self.late_trials)+'`'
                 else:
-                    return ':tdneg:`'+str(self.star_count)+'`'
+                    return ':tdneg:`'+str(self.trials)+'`'
+
+            def get_str_for_resolver(self):
+                if self.ok:
+                    return 'O'
+                if self.late_trials > 0:
+                    return 'F'
+                if len(self.result_list) > 0:
+                    return 'W'
+                return 'N'
+
+            def get_resolution_for_resolver(self):
+                if self.ok:
+                    return None
+                if self.late_trials == 0:
+                    return None
+                if self.ok_final:
+                    return (True, int(self.params.score), int(total_seconds(self.ok_time + self.agr_params.time_penalty * (self.trials-1),)))
+                else:
+                    return (False, 0, 0,)
 
         def __init__(self, aggregator):
             self.aggregator = aggregator
             self.hidden = False
             self.scores = {}
+            self.resolver = None
 
         def update(self):
             score_list = [s for s in self.scores.values() if s.ok]
@@ -290,10 +338,10 @@ class ACMBoardAggregator(AggregatorBase):
                 self.ranking_entry.row = ''
                 self.ranking_entry.individual = ''
                 self.ranking_entry.position = self.aggregator.position()
-                self.ranking_entry.save()
+                self.ranking_entry.save(force_update=True)
             else:
                 points = int(sum([s.params.score for s in score_list], 0.0))
-                time = sum([s.ok_time + self.aggregator.params.time_penalty * s.star_count for s in score_list], timedelta(0))
+                time = sum([s.ok_time + self.aggregator.params.time_penalty * (s.trials-1) for s in score_list], timedelta(0))
                 time_seconds = int(total_seconds(time))
                 time_str = str(timedelta(seconds=time_seconds))
 #                problems = ' '.join([s.get_str() for s in sorted([s for s in score_list], key=attrgetter('ok_time'))])
@@ -301,17 +349,33 @@ class ACMBoardAggregator(AggregatorBase):
                 contestant_name = self.aggregator.table.escape(self.contestant.name)
                 row = ['', contestant_name,points,time_seconds//60]
                 for problem in self.aggregator.problem_list:
-                    if self.scores.has_key(problem.id):
+                    if self.scores.has_key(problem.id) and self.scores[problem.id]!="":
                         row.append(self.scores[problem.id].get_str())
                     else:
                         row.append('\-')
 #                row.append(points)
 
+
                 self.ranking_entry.row = self.aggregator.table.generate_row(*row) + self.aggregator.table.row_separator
 #                print self.ranking_entry.row
                 self.ranking_entry.individual = ''
                 self.ranking_entry.position = self.aggregator.position(points, time_seconds, self.contestant.name)
-                self.ranking_entry.save()
+                self.ranking_entry.save(force_update=True)
+                
+                counters = []
+                statuses = []
+                solutions = []
+                for problem in self.aggregator.problem_list:
+                    if self.scores.has_key(problem.id):
+                        score = self.scores[problem.id]
+                        counters.append(score.trials)
+                        statuses.append(score.get_str_for_resolver())
+                        solutions.append(score.get_resolution_for_resolver())
+                    else:
+                        counters.append(0)
+                        statuses.append('N')
+                        solutions.append(None)
+                self.resolver = ( self.contestant.login, self.contestant.name, points, time_seconds, counters, statuses, solutions )
 
         def aggregate(self, result):
             submit = self.aggregator.submit_cache[result.submit_id]
@@ -332,20 +396,35 @@ class ACMBoardAggregator(AggregatorBase):
 
         self.problem_list = filter(lambda p : not self.problem_params[p.id].ignore, sorted(self.problem_cache.values(), key=attrgetter('code')))
        
-        columns = [(4, 'Lp.'), (32, 'Name'), (4, 'Score'), (8, 'Time'),]
+        columns = [(32, 'Rank'), (320, 'Name'), (32, 'Score'), (32, 'Time'),]
 
         for problem in self.problem_list:
-            columns.append((16, problem.code))
+            columns.append((32, problem.code))
 
         self.table = RestTable(*columns)
         
-        rhead = '.. role:: tdpos\n\n.. role:: tdneg\n\n'
+        rhead = '.. role:: tdpos\n\n.. role:: tdneg\n\n.. role:: tdpnd\n\n.. role:: signature\n\n'
         self.ranking.header = rhead+self.table.row_separator + self.table.header_row + self.table.header_separator
         self.ranking.footer = self.table.header_row + self.table.row_separator
-        self.ranking.save()
+        self.ranking.save(force_update=True)
         
     def get_score(self):
         return self.ACMScore(self)
+
+    def update_resolver(self):
+        if self.params.resolver:
+            resolver = [s.resolver for s in sorted(self.scores.values(), key=attrgetter('ranking_entry.position')) if s.ranking_entry.row != '']
+            blob = self.ranking.oa_set_blob('resolver.json')
+            blob.write(json.dumps(resolver))
+            blob.close()
+
+    def checked_test_suite_results(self, test_suite_results):
+        super(ACMBoardAggregator, self).checked_test_suite_results(test_suite_results)
+        self.update_resolver()
+
+    def changed_contestants(self):
+        super(ACMBoardAggregator, self).changed_contestants()
+        self.update_resolver()
 
 
 class PointsAggregator(AggregatorBase):
@@ -372,8 +451,8 @@ class PointsAggregator(AggregatorBase):
                 self.problem = problem
 
             def aggregate(self, result):
-                checked = int(result.oa_get_str('checked'))
-                passed = int(result.oa_get_str('passed'))
+                checked = int(result.oa_get_str('checked', '0'))
+                passed = int(result.oa_get_str('passed', '0'))
                 if checked == 0:
                     points = 0
                 else:
@@ -401,7 +480,7 @@ class PointsAggregator(AggregatorBase):
                 self.ranking_entry.row = ''
                 self.ranking_entry.individual = ''
                 self.ranking_entry.position = self.aggregator.position()
-                self.ranking_entry.save()
+                self.ranking_entry.save(force_update=True)
             else:
                 points = sum([self.scores[p.id].points for p in self.aggregator.problem_list if self.scores[p.id].points is not None], 0)
                 
@@ -418,7 +497,7 @@ class PointsAggregator(AggregatorBase):
                 self.ranking_entry.row = self.aggregator.table.generate_row(*row) + self.aggregator.table.row_separator
                 self.ranking_entry.individual = ''
                 self.ranking_entry.position = self.aggregator.position(points, self.contestant.name)
-                self.ranking_entry.save()
+                self.ranking_entry.save(force_update=True)
 
         def aggregate(self, result):
             submit = self.aggregator.submit_cache[result.submit_id]
@@ -432,7 +511,7 @@ class PointsAggregator(AggregatorBase):
 
         self.problem_list = filter(lambda p : not self.problem_params[p.id].ignore, sorted(self.problem_cache.values(), key=attrgetter('code')))
        
-        columns = [(5, 'Lp.'), (20, 'Name')]
+        columns = [(5, 'Rank'), (20, 'Name')]
 
         for problem in self.problem_list:
             columns.append((10, problem.code))
@@ -443,7 +522,7 @@ class PointsAggregator(AggregatorBase):
         
         self.ranking.header = self.table.row_separator + self.table.header_row + self.table.header_separator
         self.ranking.footer = ''
-        self.ranking.save()
+        self.ranking.save(force_update=True)
 
     def get_score(self):
         return self.PointsScore(self)
@@ -471,8 +550,8 @@ class MarksAggregator(AggregatorBase):
 #@              <param type="bool"     name="show"           description="Show column for this problem" default="true"/>
 #@              <param type="bool"     name="show_max_score" description="Show maximum possible score"/>
 #@              <param type="bool"     name="obligatory"     description="Problem is obligatory" default="false"/>
-#@              <param type="float"    name="max_score"      description="Maximum score for problem" default="1"/>
-#@              <param type="float"    name="min_score"      description="Minimum score for problem" default="-1"/>
+#@              <param type="float"    name="max_score"      description="Maximum score for problem"/>
+#@              <param type="float"    name="min_score"      description="Minimum score for problem"/>
 #@              <param type="datetime" name="time_start"     description="Submission start time"/>
 #@              <param type="datetime" name="time_stop"      description="Ignore submits after"/>
 #@              <param type="datetime" name="time_start_descent"       description="Descent start time"/>
@@ -503,7 +582,7 @@ class MarksAggregator(AggregatorBase):
                 self.ranking_entry.row = ''
                 self.ranking_entry.individual = ''
                 self.ranking_entry.position = self.aggregator.position()
-                self.ranking_entry.save()
+                self.ranking_entry.save(force_update=True)
             else:
                 all_ok = True
                 points = []
@@ -583,7 +662,7 @@ class MarksAggregator(AggregatorBase):
                 self.ranking_entry.row = self.aggregator.table.generate_row(*columns) + self.aggregator.table.row_separator
                 self.ranking_entry.individual = ''
                 self.ranking_entry.position = self.aggregator.position(self.contestant.sort_field)
-                self.ranking_entry.save()
+                self.ranking_entry.save(force_update=True)
 
         def aggregate(self, result):
             submit = self.aggregator.submit_cache[result.submit_id]
@@ -646,7 +725,7 @@ class MarksAggregator(AggregatorBase):
         
         self.ranking.header = self.table.row_separator + self.table.header_row + self.table.header_separator
         self.ranking.footer = ''
-        self.ranking.save()
+        self.ranking.save(force_update=True)
         
     def get_score(self):
         return self.MarksScore(self)
@@ -676,7 +755,7 @@ class ACMProblemStats(AggregatorBase):
                 self.ranking.header += self.table.generate_row(*col)+self.table.row_separator
         fcol = [' **Total** ',' **'+unicode(self.allsubmits)+'** '] + [(' **'+unicode(self.total[r])+'** ') for r in self.results]
         self.ranking.header += self.table.generate_row(*fcol)+self.table.row_separator            
-        self.ranking.save()
+        self.ranking.save(force_update=True)
 
     def init(self):
         super(ACMProblemStats, self).init()
@@ -745,18 +824,18 @@ class GoogleSpreadsheetAggregator(AggregatorBase):
             url = SECRET_GOOGLE_SPREADSHEET_SERVICE
             values = {'action': action, 'ranking': self.ranking.id}
             if action == 'create':
-            	values['admins'] = self.params.admins
+                values['admins'] = self.params.admins
                 values['name'] = 'Satori: ' + self.ranking.contest.name + ': ' + self.ranking.name
             if action == 'contestants' or action == 'add_contestants':
-            	values['contestants'] = json.dumps(params, cls=self.encoder)
+                values['contestants'] = json.dumps(params, cls=self.encoder)
             if action == 'problems' or action == 'add_problems':
-            	values['problems'] = json.dumps(params, cls=self.encoder)
+                values['problems'] = json.dumps(params, cls=self.encoder)
             if action == 'tests' or action == 'add_tests':
-            	values['tests'] = json.dumps(params, cls=self.encoder)
+                values['tests'] = json.dumps(params, cls=self.encoder)
             if action == 'submits' or action == 'add_submits':
-            	values['submits'] = json.dumps(params, cls=self.encoder)
+                values['submits'] = json.dumps(params, cls=self.encoder)
             if action == 'results' or action == 'add_results':
-            	values['results'] = json.dumps(params, cls=self.encoder)
+                values['results'] = json.dumps(params, cls=self.encoder)
             headers = {"Content-Type": "application/x-www-form-urlencoded", "Accept": "text/html;q=0.9", "Accept-Charset": "utf8", "Accept-Language": "en-us,en;q=0.5"}
 
             logging.debug('START: '+urllib.urlencode(values))
@@ -776,7 +855,7 @@ class GoogleSpreadsheetAggregator(AggregatorBase):
         self.call('problems', problems)
         tests = []
         for pid in self.problem_cache:
-        	ts = self.test_suites[pid]
+            ts = self.test_suites[pid]
             tests += [ {'id': str(pid)+'_'+str(t.id), 'problem': pid, 'name': t.name} for t in self.test_cache[ts.id] ]
         self.call('tests', tests)
         submits = [ {'id': s.id, 'contestant': s.contestant.id, 'problem': s.problem.id, 'time': s.time} for s in self.submit_cache.values() ]
@@ -789,7 +868,7 @@ class GoogleSpreadsheetAggregator(AggregatorBase):
         self.contestant_cache = set()
         self.test_cache = {}
         for pid in self.problem_cache:
-        	ts = self.test_suites[pid]
+            ts = self.test_suites[pid]
             self.test_cache[ts.id] = [tm.test for tm in TestMapping.objects.filter(suite__id=ts.id) ]
         self.results = {}
         self.recalculate()
@@ -799,7 +878,7 @@ class GoogleSpreadsheetAggregator(AggregatorBase):
             contestants = [ {'id': c.id, 'name': c.name} for c in Contestant.objects.filter(contest__id=self.ranking.contest_id, accepted=True) ]
             self.call('contestants', contestants)
         else:
-        	self.recalculate()
+            self.recalculate()
     
     def checked_test_suite_results(self, test_suite_results):
         append = []
@@ -809,34 +888,133 @@ class GoogleSpreadsheetAggregator(AggregatorBase):
             if s.contestant.invisible and not self.params.show_invisible:
                 continue
             pid = s.problem.id
-        	ts = self.test_suites[pid]
+            ts = self.test_suites[pid]
             for t in self.test_cache[ts.id]:
                 try:
-                	tr=TestResult.objects.get(submit__id=s.id, test__id=t.id)
+                    tr=TestResult.objects.get(submit__id=s.id, test__id=t.id)
                 except:
                     continue
-            	key = (s.id, pid, t.id)
+                key = (s.id, pid, t.id)
                 if key in self.results:
-                	self.ok = False
+                    self.ok = False
                 val = {'submit': s.id, 'test': str(pid)+'_'+str(t.id)}
                 for (k, v) in tr.oa_get_map().iteritems():
                     if not v.is_blob:
-                    	val['result_'+k] = v.value
+                        val['result_'+k] = v.value
                 self.results[key] = val
                 append += [val]
         if self.ok:
             self.call('add_results', append)
         else:
-        	self.recalculate()
+            self.recalculate()
 
     def created_submits(self, submits):
         if self.ok:
             self.call('add_submits', [ {'id': s.id, 'contestant': s.contestant.id, 'problem': s.problem.id, 'time': s.time} for s in submits ])
         else:
-        	self.recalculate()
+            self.recalculate()
         logging.debug('hello')
         super(GoogleSpreadsheetAggregator, self).created_submits(submits)
 
+class BaloonAggregator(AggregatorBase):
+    """
+#@<aggregator name="Baloon dispatcher">
+#@      <general>
+#@              <param type="bool"     name="show_invisible" description="Show invisible submits" default="false"/>
+#@              <param type="datetime" name="time_start"     description="Submission start time"/>
+#@              <param type="datetime" name="time_stop"      description="Submission stop time"/>
+#@              <param type="text"     name="script"         description="Print script"/>
+#@      </general>
+#@      <problem>
+#@              <param type="bool"     name="ignore"         description="Ignore problem" default="false"/>
+#@      </problem>
+#@</aggregator>
+    """
+    def position(self, name=''):
+        return (u'%s' % (name))[0:50]
+
+    class BaloonScore(object):
+        class BaloonProblemScore(object):
+            def __init__(self, score, problem):
+                self.score = score
+                self.problem = problem
+                self.ok = False
+                self.params = self.score.aggregator.problem_params[problem.id]
+                self.agr_params = self.score.aggregator.params
+
+            def aggregate(self, result):
+                if self.params.ignore:
+                    return
+                if self.ok:
+                    return
+                ok = result.oa_get_str('status') in ['OK', 'ACC']
+                if not ok:
+                    return
+                time = self.score.aggregator.submit_cache[result.submit_id].time
+                if self.agr_params.time_stop and time > self.agr_params.time_stop:
+                    return
+                self.ok = True
+#TODO: use print_script to print result.submit_id
+                import subprocess
+                subprocess.check_output([unicode(self.agr_params.script), unicode(result.submit_id)], stderr=subprocess.STDOUT)
+
+            def get_str(self):
+                return self.problem.code
+
+        def __init__(self, aggregator):
+            self.aggregator = aggregator
+            self.hidden = False
+            self.scores = {}
+
+        def initialize(self):
+            row = self.aggregator.table.parse_row(self.ranking_entry.row[0:-len(self.aggregator.table.row_separator)])
+            baloons = set([self.aggregator.table.unescape(b) for b in row[2].strip().split(' ')])
+            for problem in self.aggregator.problem_cache.itervalues():
+                if problem.code in baloons:
+                    if problem.id not in self.scores:
+                        self.scores[problem.id] = self.BaloonProblemScore(self, problem)
+                    self.scores[problem.id].ok = True
+
+        def update(self):
+            score_list = [s for s in self.scores.values() if s.ok]
+            if self.hidden:
+                self.ranking_entry.row = ''
+                self.ranking_entry.individual = ''
+                self.ranking_entry.position = self.aggregator.position()
+                self.ranking_entry.save(force_update=True)
+            else:
+                problems = ' '.join(sorted([s.get_str() for s in score_list]))
+                contestant_name = self.aggregator.table.escape(self.contestant.name)
+                row = ['', contestant_name, problems]
+                self.ranking_entry.row = self.aggregator.table.generate_row(*row) + self.aggregator.table.row_separator
+                self.ranking_entry.individual = ''
+                self.ranking_entry.position = self.aggregator.position(self.contestant.sort_field)
+                self.ranking_entry.save(force_update=True)
+
+        def aggregate(self, result):
+            submit = self.aggregator.submit_cache[result.submit_id]
+            if submit.problem_id not in self.scores:
+                self.scores[submit.problem_id] = self.BaloonProblemScore(self, self.aggregator.problem_cache[submit.problem_id])
+            self.scores[submit.problem_id].aggregate(result)
+
+    def __init__(self, supervisor, ranking):
+        super(BaloonAggregator, self).__init__(supervisor, ranking)
+
+    def init(self):
+        super(BaloonAggregator, self).init()
+
+        self.problem_list = filter(lambda p : not self.problem_params[p.id].ignore, sorted(self.problem_cache.values(), key=attrgetter('code')))
+       
+        columns = [(32, 'Lp.'), (320, 'Name'), (32, 'Baloons'),]
+
+        self.table = RestTable(*columns)
+        
+        self.ranking.header = self.table.row_separator + self.table.header_row + self.table.header_separator
+        self.ranking.footer = self.table.header_row + self.table.row_separator
+        self.ranking.save(force_update=True)
+        
+    def get_score(self):
+        return self.BaloonScore(self)
 
 aggregators = {}
 for item in globals().values():
