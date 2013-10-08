@@ -1,0 +1,34 @@
+{% extends "templates/index.html" %}
+{% load url from future %}
+
+{% block title %}
+Edit problem
+{% endblock %}
+
+{% block content %}
+        {% if editing %}
+            <h4>{{ editing.code }} - {{ editing.title }}</h4>
+        {% endif %}
+        <p>Based on problem {{ base.name }} ({{base.description}}).</p>
+        {% if editing %}
+            <form enctype="multipart/form-data" action="{% url 'contest_problems_edit' page_info.contest.id editing.id %}" method="POST">
+        {% else %}
+            <form enctype="multipart/form-data" action="{% url 'contest_problems_add_selected' page_info.contest.id base.id %}" method="POST">
+        {% endif %}
+        <table class="form">
+            {{ form.as_table }}
+        </table>
+        {% if editing %}
+            <input class="button" type="submit" name="change" value="Change problem"/>
+            <input class="button button_warn" type="submit" name="delete" value="Delete problem"/>
+            {% if pdf_file %}
+            <input class="button button_small button_warn" type="submit" name="remove_pdf" value="Remove PDF statement"/>
+            {% endif %}
+            </form>
+            {% include "templates/attachments_edit.html" %}
+        {% else %}
+            <input class="button" type="submit" value="Add problem"/>
+            </form>
+            {% include "templates/attachments_add.html" %}
+        {% endif %}
+{% endblock %}
