@@ -1,0 +1,49 @@
+{% extends "templates/index.html" %}
+{% load url from future %}
+
+{% block title %}
+Select contest
+{% endblock %}
+
+{% block content %}
+
+{% if managed %}
+<h3>Managed contests:</h3>
+<table class="results">
+    {{ managed.render_table }}
+</table>
+    {{ managed.render_filters }}
+{% endif %}
+
+
+{% if participating %}
+<h3>Joined contests:</h3>
+<table class="results">
+    {{ participating.render_table }}
+</table>
+    {{ participating.render_filters }}
+{% endif %}
+
+
+{% if other %}
+<h3>Other contests:</h3>
+<table class="results">
+    {{ other.render_table }}
+</table>
+    {{ other.render_filters }}
+
+{% endif %}
+
+{% if create_form %}
+<hr class="divide"/>
+<h4>Add new contest</h4>
+<form action="" method="POST">
+<table>
+{{ create_form.as_table }}
+</table>
+<input class="button" type="submit" name="addcontest" value="Add contest"/>
+</form>
+{% endif %}
+
+
+{% endblock %}

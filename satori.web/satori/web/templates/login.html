@@ -1,0 +1,19 @@
+{% extends "templates/index.html" %}
+{% load url from future %}
+
+{% block title %}
+Log in
+{% endblock %}
+
+{% block content %}
+
+<p>Please fill in the form to login.</p>
+
+<form method="post" action="">
+    <table>
+      {{ form.as_table }}
+    </table>
+    <input class="button" type="submit" value="Submit"/>
+</form>
+
+{% endblock %}
