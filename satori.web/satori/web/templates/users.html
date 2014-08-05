@@ -1,0 +1,32 @@
+{% extends "templates/index.html" %}
+{% load url from future %}
+
+{% block title %}
+Users
+{% endblock %}
+
+{% block content %}
+
+
+<h4>All users</h4>
+<table class="results">
+    {{ user_list.render_table }}
+</table>
+    {{ user_list.render_scrollbar }}
+
+{{ user_list.render_filters }}
+
+<hr class="divide"/>
+
+{% if edit_form %}
+<h4>Edit user</h4>
+<form action="" method="POST">
+<table>
+{{ edit_form.as_table }}
+</table>
+<input class="button" type="submit" name="edit user" value="Edit user"/>
+</form>
+{% endif %}
+
+
+{% endblock %}
