@@ -1,0 +1,19 @@
+{% extends "templates/index.html" %}
+{% load url from future %}
+
+{% block title %}
+Copy problems
+{% endblock %}
+
+{% block content %}
+{{ copytable.render_filters }}
+
+<form action="" method="POST">
+<input type="hidden" name="cid" value="{{page_info.contest.id}}"/>
+<table class="results">
+{{ copytable.render_table }}
+</table>
+
+<input type="submit" class="button" value="Copy"/>
+</form>
+{% endblock %}
