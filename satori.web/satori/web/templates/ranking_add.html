@@ -1,0 +1,24 @@
+{% extends "templates/index.html" %}
+{% load url from future %}
+
+{% block title %}
+Add ranking
+{% endblock %}
+
+{% block header %}
+{{ form.media }}
+{% endblock %}
+
+
+
+{% block content %}
+
+<form action="" method="POST">
+<table>
+{{ form.as_table }}
+</table>
+<input class="button" type="submit" value="Create"/>
+</form>
+
+
+{% endblock %}
